@@ -98,7 +98,7 @@ export const resetOTP = TryCatch(async (req, res, next) => {
   });
 });
 
-export const resetPassword = TryCatch(async (req, res, next) => {
+export const forgetPassword = TryCatch(async (req, res, next) => {
   const { email } = req.body;
   if (!email) {
     return next(new ErrorHandler("Email is required", 400));
@@ -231,71 +231,78 @@ export const updateRole = TryCatch(async (req, res, next) => {
   });
 });
 
-export const checkForgetPasswordOTP = async (req, res,next) => {
-  try {
-    const { otp, email } = req.body;
-    if (!email) {
-      return next(new ErrorHandler("Please enter your email", 400));
-    }
-
-    if (!otp) {
-      return next(new ErrorHandler("please enter otp", 400));
-    }
-
-    const user = await User.findOne({ email });
-
-    // If the user is not found
-    if (!user) {
-      return next(new ErrorHandler("email not found ", 400));
-    }
-
-    if (
-      user.resetPasswordOTP !== otp ||
-      user.resetPasswordOTPExpiry < Date.now()
-    ) {
-      return next(new ErrorHandler("OTP Invaild or has been Expired ", 400));
-    }
-
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: `Otp is  correct`,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+export const checkForgetPasswordOTP = TryCatch(async (req, res, next) => {
+  const { otp, email } = req.body;
+  if (!email) {
+    return next(new ErrorHandler("Please enter your email", 400));
   }
-};
 
-export const resetpassword = async (req, res) => {
+  if (!otp) {
+    return next(new ErrorHandler("please enter otp", 400));
+  }
+
+  const user = await User.findOne({ email });
+
+  // If the user is not found
+  if (!user) {
+    return next(new ErrorHandler("email not found ", 400));
+  }
+  console.log(user.resetPasswordOTP, otp);
+  if (
+    user.resetPasswordOTP !== otp ||
+    user.resetPasswordOTPExpiry < Date.now()
+  ) {
+    return next(new ErrorHandler("OTP Invaild or has been Expired ", 400));
+  }
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: `Otp is  correct`,
+  });
+});
+
+export const resetPassword = async (req, res) => {
   try {
-    const { otp, password } = req.body;
-    if (!otp || !password) {
+    const { email, otp, password } = req.body;
+
+    // Validate inputs
+    if (!email || !otp || !password) {
       return res
         .status(400)
-        .json({ success: false, message: "please enter all fields" });
+        .json({ success: false, message: "Please provide all required fields." });
     }
-    const user = await User.findOne({
-      resetPasswordOTP: otp,
-      resetPasswordOTPExpiry: { $gt: Date.now() },
-    }).select("+password");
 
+    // Find user by email
+    const user = await User.findOne({
+      email,
+      resetPasswordOTP: otp,
+      resetPasswordOTPExpiry: { $gt: Date.now() }, // Ensure OTP is valid
+    }).select("+password"); // Include password field for modification
+
+    // Validate user and OTP
     if (!user) {
       return res
         .status(400)
-        .json({ success: false, message: "OTP Invaild or has been Expired" });
+        .json({ success: false, message: "Invalid email or OTP has expired." });
     }
 
+    // Update password and clear OTP fields
     user.password = password;
     user.resetPasswordOTP = null;
     user.resetPasswordOTPExpiry = null;
+
+    // Save user with the updated password
     await user.save();
 
     res.status(200).json({
       success: true,
-      message: `Password Changed Successfully`,
+      message: "Password changed successfully.",
     });
   } catch (error) {
+    // Handle unexpected errors
     res.status(500).json({ success: false, message: error.message });
   }
 };
+

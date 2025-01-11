@@ -1,10 +1,16 @@
 import { Router } from "express";
-import { checkForgetPasswordOTP, login, register, resetPassword } from "../controller/userController.js";
+import { checkForgetPasswordOTP, forgetPassword, login, register, resetPassword } from "../controller/userController.js";
 
 const userRouter=Router();
-
-userRouter.post("/register",register)
+// created signin  route
 userRouter.post("/login",login)
-userRouter.post("/forgotpassword",resetPassword)
+// step by step for register
+userRouter.post("/register",register)
+
+
+// step by step for forget password 
+userRouter.post("/forgotpassword",forgetPassword)
 userRouter.put("/otp-check",checkForgetPasswordOTP)
+userRouter.put("/reset-password",resetPassword)
+
 export default userRouter;
