@@ -231,19 +231,55 @@ export const updateRole = TryCatch(async (req, res, next) => {
   });
 });
 
+export const checkForgetPasswordOTP = async (req, res,next) => {
+  try {
+    const { otp, email } = req.body;
+    if (!email) {
+      return next(new ErrorHandler("Please enter your email", 400));
+    }
+
+    if (!otp) {
+      return next(new ErrorHandler("please enter otp", 400));
+    }
+
+    const user = await User.findOne({ email });
+
+    // If the user is not found
+    if (!user) {
+      return next(new ErrorHandler("email not found ", 400));
+    }
+
+    if (
+      user.resetPasswordOTP !== otp ||
+      user.resetPasswordOTPExpiry < Date.now()
+    ) {
+      return next(new ErrorHandler("OTP Invaild or has been Expired ", 400));
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Otp is  correct`,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const resetpassword = async (req, res) => {
   try {
     const { otp, password } = req.body;
-
-    const user = await User.findOne({
-      resetPasswordOTP: otp,
-      resetPasswordOTPExpiry: { $gt: Date.now() },
-    }).select("+password");
     if (!otp || !password) {
       return res
         .status(400)
         .json({ success: false, message: "please enter all fields" });
     }
+    const user = await User.findOne({
+      resetPasswordOTP: otp,
+      resetPasswordOTPExpiry: { $gt: Date.now() },
+    }).select("+password");
+
     if (!user) {
       return res
         .status(400)
