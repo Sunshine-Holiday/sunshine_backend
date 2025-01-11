@@ -13,7 +13,7 @@ const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = [
       "http://localhost:5173",
-      "https://clothing-eccomerce.vercel.app",
+     process.env.FRONTEND_URL,
     ];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
