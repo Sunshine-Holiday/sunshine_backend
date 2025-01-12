@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   checkForgetPasswordOTP,
+  contact,
   forgetPassword,
   getMyProfile,
   login,
@@ -12,6 +13,9 @@ import {
 import { isAuthenticated } from "../middleware/auth.js";
 
 const userRouter = Router();
+// send email  for contact
+userRouter.post("/contact", contact);
+
 // created signin  route
 userRouter.post("/login", login);
 // step by step for register

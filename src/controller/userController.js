@@ -3,6 +3,7 @@ import { TryCatch } from "../middleware/error.js";
 import User from "../model/userModel.js";
 import { sendMail } from "../utils/sendOTP.js";
 import {
+  contactHTML,
   createEmailHTML,
   generateOTP,
   resetPasswordHTML,
@@ -11,7 +12,7 @@ import ErrorHandler from "../utils/utilit-class.js";
 import sendToken from "../utils/sendToken.js";
 
 export const register = TryCatch(async (req, res, next) => {
-  const { username, email, password,phone } = req.body;
+  const { username, email, password, phone } = req.body;
 
   if (!username || !email || !password) {
     return next(new ErrorHandler("Please fill in all fields", 400));
@@ -26,7 +27,7 @@ export const register = TryCatch(async (req, res, next) => {
   //create user and save
   const newUser = await User.create({
     username: username,
-    phone:phone,
+    phone: phone,
     email,
     password,
     otp,
@@ -318,5 +319,23 @@ export const updateProfile = TryCatch(async (req, res, next) => {
     success: true,
     message: "Profile updated successfully",
     user,
+  });
+});
+
+export const contact = TryCatch(async (req, res, next) => {
+  const { name, email, message } = req.body;
+  if (!name || !email || !message) {
+    return next(new ErrorHandler("Please fill in all fields", 400));
+  }
+  const html = contactHTML({ name, email, message });
+  await sendMail({
+    email: process.env.SMTP_USER,
+    subject: `Contact request from ${name}`,
+    html,
+    from: email,
+  });
+  return res.status(200).json({
+    success: true,
+    message: "Message sent successfully",
   });
 });

@@ -101,3 +101,35 @@ export const resetPasswordHTML = (username, otp) => `
   </div>
 </body>
 </html>`;
+
+export const contactHTML = ({ name, email, message }) => `
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+      }
+      .container {
+        padding: 20px;
+      }
+      .footer {
+        margin-top: 20px;
+        font-size: 0.9em;
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+  <p><strong>Name:</strong> ${name}</p>
+    <p><strong>Email:</strong> ${email}</p>
+    <p><strong>Message:</strong>     <span>${message}</span></p>
+
+    </div>
+    <div class="footer">
+      <p>This email is intended only for the recipient. If you received this email by mistake, please delete it immediately.</p>
+  </body>
+</html>`;
