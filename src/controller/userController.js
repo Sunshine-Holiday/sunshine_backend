@@ -162,6 +162,7 @@ export const login = TryCatch(async (req, res, next) => {
 // Get the currently logged-in user's profile
 export const getMyProfile = TryCatch(async (req, res, next) => {
   const user = await User.findById(req.user);
+  console.log(user);
   if (!user) {
     return next(new ErrorHandler("User not found", 404));
   }
@@ -169,6 +170,7 @@ export const getMyProfile = TryCatch(async (req, res, next) => {
   res.status(200).json({
     success: true,
     user,
+    message: "User profile retrieved successfully",
   });
 });
 
@@ -263,46 +265,57 @@ export const checkForgetPasswordOTP = TryCatch(async (req, res, next) => {
   });
 });
 
-export const resetPassword = async (req, res) => {
-  try {
-    const { email, otp, password } = req.body;
+export const resetPassword = TryCatch(async (req, res) => {
+  const { email, otp, password } = req.body;
 
-    // Validate inputs
-    if (!email || !otp || !password) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide all required fields." });
-    }
-
-    // Find user by email
-    const user = await User.findOne({
-      email,
-      resetPasswordOTP: otp,
-      resetPasswordOTPExpiry: { $gt: Date.now() }, // Ensure OTP is valid
-    }).select("+password"); // Include password field for modification
-
-    // Validate user and OTP
-    if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid email or OTP has expired." });
-    }
-
-    // Update password and clear OTP fields
-    user.password = password;
-    user.resetPasswordOTP = null;
-    user.resetPasswordOTPExpiry = null;
-
-    // Save user with the updated password
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Password changed successfully.",
+  // Validate inputs
+  if (!email || !otp || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide all required fields.",
     });
-  } catch (error) {
-    // Handle unexpected errors
-    res.status(500).json({ success: false, message: error.message });
   }
-};
 
+  // Find user by email
+  const user = await User.findOne({
+    email,
+    resetPasswordOTP: otp,
+    resetPasswordOTPExpiry: { $gt: Date.now() }, // Ensure OTP is valid
+  }).select("+password"); // Include password field for modification
+
+  // Validate user and OTP
+  if (!user) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid email or OTP has expired." });
+  }
+
+  // Update password and clear OTP fields
+  user.password = password;
+  user.resetPasswordOTP = null;
+  user.resetPasswordOTPExpiry = null;
+
+  // Save user with the updated password
+  await user.save();
+
+  return res.status(200).json({
+    success: true,
+    message: "Password changed successfully.",
+  });
+});
+
+export const updateProfile = TryCatch(async (req, res, next) => {
+  const { username, email, phone, address } = req.body;
+console.log({ username, email, phone, address });
+  const id = req.user._id;
+  const user = await User.findByIdAndUpdate(
+    id,
+    { username, email, phone, address },
+    { new: true, runValidators: true }
+  );
+return res.status(200).json({
+    success: true,
+    message: "Profile updated successfully",
+    user,
+  });
+});
