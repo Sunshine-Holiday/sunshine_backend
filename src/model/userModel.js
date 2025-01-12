@@ -51,21 +51,17 @@ const userSchema = new Schema(
     },
     phone: {
       type: String,
-      unique: true,
-      validate: {
-        validator: function (value) {
-          // Basic phone number validation (allows numbers with optional '+' and digits 10-15)
-          return /^\+?\d{10,15}$/.test(value);
-        },
-        message: (props) => `${props.value} is not a valid phone number!`,
-      },
+      sparse: true,
+      // validate: {
+      //   validator: function (value) {
+      //     // Basic phone number validation (allows numbers with optional '+' and digits 10-15)
+      //     return /^\+?\d{10,15}$/.test(value);
+      //   },
+      //   message: (props) => `${props.value} is not a valid phone number!`,
+      // },
     },
     address: {
-      street: { type: String },
-      city: { type: String },
-      state: { type: String },
-      postalCode: { type: String },
-      country: { type: String },
+      type: String,
     },
   },
   {

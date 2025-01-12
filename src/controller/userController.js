@@ -11,7 +11,7 @@ import ErrorHandler from "../utils/utilit-class.js";
 import sendToken from "../utils/sendToken.js";
 
 export const register = TryCatch(async (req, res, next) => {
-  const { username, email, password } = req.body;
+  const { username, email, password,phone } = req.body;
 
   if (!username || !email || !password) {
     return next(new ErrorHandler("Please fill in all fields", 400));
@@ -26,6 +26,7 @@ export const register = TryCatch(async (req, res, next) => {
   //create user and save
   const newUser = await User.create({
     username: username,
+    phone:phone,
     email,
     password,
     otp,
@@ -200,7 +201,7 @@ export const verifyEmailOTP = TryCatch(async (req, res, next) => {
   user.otp = null;
   user.otp_expiry = null;
   await user.save();
-  sendToken(res, user, 201, `Welcome , ${user.name}`);
+  sendToken(user, 200, res, "Email verified successfully");
 });
 
 export const updateRole = TryCatch(async (req, res, next) => {
@@ -306,14 +307,14 @@ export const resetPassword = TryCatch(async (req, res) => {
 
 export const updateProfile = TryCatch(async (req, res, next) => {
   const { username, email, phone, address } = req.body;
-console.log({ username, email, phone, address });
+  console.log({ username, email, phone, address });
   const id = req.user._id;
   const user = await User.findByIdAndUpdate(
     id,
     { username, email, phone, address },
     { new: true, runValidators: true }
   );
-return res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "Profile updated successfully",
     user,
