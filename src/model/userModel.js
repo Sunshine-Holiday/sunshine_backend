@@ -33,6 +33,10 @@ const userSchema = new Schema(
       required: true,
       select: false,
     },
+    profile: {
+      public_id: { type: String },
+      url: { type: String },
+    },
     emailVerified: {
       type: Boolean,
       default: false,
