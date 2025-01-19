@@ -339,3 +339,91 @@ export const contact = TryCatch(async (req, res, next) => {
     message: "Message sent successfully",
   });
 });
+
+// admin -- All User Detail
+export const getAllUserDetails = TryCatch(async (req, res, next) => {
+  const user = await User.find({}).sort({ createdAt: -1 });
+
+  return res.status(200).json({
+    message: "All user  found successfull",
+    success: true,
+    user,
+  });
+});
+
+// admin -- single user Details
+export const getSingleUserDetail = TryCatch(
+  async (req, res, next) => {
+    const { id } = req.params;
+    // console.log(req.query)
+    if (!id) {
+      return next(
+        new ErrorHandler("Id is required to access user Details", 400)
+      );
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return next(
+        new ErrorHandler("Id is invalid to access user Details", 400)
+      );
+    }
+    return res.status(200).json({
+      message: " user  found successfull",
+      success: true,
+      user,
+    });
+  }
+);
+
+export const updateSingleUserDetails = TryCatch(async (req, res, next) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return next(new ErrorHandler("Id is required to access user details", 400));
+  }
+
+  // Fetch the user's current details
+  const user = await User.findById(id);
+
+  if (!user) {
+    return next(new ErrorHandler("User not found with the provided id", 404));
+  }
+
+  // Toggle role between "admin" and "user"
+  const updatedRole = user.role === "admin" ? "user" : "admin";
+
+  // Update the user's role
+  const updatedUser = await User.findByIdAndUpdate(
+    id,
+    { role: updatedRole },
+    { new: true, runValidators: true }
+  );
+
+  if (!updatedUser) {
+    return next(new ErrorHandler("Failed to update user role", 400));
+  }
+
+  return res.status(200).json({
+    message: `User role updated successfully to ${updatedRole}`,
+    success: true,
+    user: updatedUser,
+  });
+});
+
+export const deleteUser = TryCatch(async (req, res, next) => {
+  const { id } = req.params;
+  if (!id) {
+    return next(new ErrorHandler("Id is required to delete user", 400));
+  }
+
+  const deletedUser = await User.findByIdAndDelete(id);
+  if (!deletedUser) {
+    return next(new ErrorHandler("Id is invalid to delete user", 400));
+  }
+
+  return res.status(200).json({
+    message: "User deleted successfully",
+    success: true,
+  });
+});

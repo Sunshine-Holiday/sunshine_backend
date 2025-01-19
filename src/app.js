@@ -4,17 +4,14 @@ import { connectDB } from "./utils/db.js";
 import cors from "cors";
 import { errorMiddleware } from "./middleware/error.js";
 import userRouter from "./router/userRoute.js";
-
+import blogRouter from "./router/blogRouter.js";
 config();
 const app = express();
 connectDB(process.env.MONGO_URI);
 const PORT = process.env.PORT;
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigins = [
-      "http://localhost:5173",
-     process.env.FRONTEND_URL,
-    ];
+    const allowedOrigins = ["http://localhost:5173", process.env.FRONTEND_URL];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -34,6 +31,7 @@ app.get("/", (req, res) => {
   });
 });
 app.use("/api/v1/user", userRouter);
+app.use("/api/v1/blog", blogRouter);
 app.use("/uploads", express.static("uploads"));
 app.use(errorMiddleware);
 app.listen(PORT, () => console.log("server is working port", PORT));

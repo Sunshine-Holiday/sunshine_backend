@@ -2,15 +2,19 @@ import { Router } from "express";
 import {
   checkForgetPasswordOTP,
   contact,
+  deleteUser,
   forgetPassword,
+  getAllUserDetails,
   getMyProfile,
+  getSingleUserDetail,
   login,
   register,
   resetPassword,
   updateProfile,
+  updateSingleUserDetails,
   verifyEmailOTP,
 } from "../controller/userController.js";
-import { isAuthenticated } from "../middleware/auth.js";
+import { adminOnly, isAuthenticated } from "../middleware/auth.js";
 
 const userRouter = Router();
 // send email  for contact
@@ -32,5 +36,16 @@ userRouter.put("/reset-password", resetPassword);
 userRouter
   .get("/profile", isAuthenticated, getMyProfile)
   .put("/profile", isAuthenticated, updateProfile);
+
+
+
+  // admin ----
+
+  userRouter.route("/allUser").get(isAuthenticated, adminOnly, getAllUserDetails);
+  userRouter
+    .route("/allUser/:id")
+    .get(isAuthenticated, adminOnly, getSingleUserDetail)
+    .put(isAuthenticated, adminOnly, updateSingleUserDetails)
+    .delete(isAuthenticated, adminOnly, deleteUser);
 
 export default userRouter;
