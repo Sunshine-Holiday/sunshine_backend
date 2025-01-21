@@ -33,11 +33,19 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Set a file size limit (e.g., 10MB)
+// File size limit configuration, with dynamic limit based on file type
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB file size limit
+  limits: (req, file) => {
+    if (file.mimetype.startsWith("video/")) {
+      // No limit for video files
+      return { fileSize: Infinity }; 
+    } else {
+      // Limit for images (10MB)
+      return { fileSize: 10 * 1024 * 1024 };
+    }
+  },
 }).single('file');
 
 // Error handling middleware
@@ -46,9 +54,8 @@ export const fileUploadErrorHandler = (err, req, res, next) => {
     return res.status(400).send({ error: req.fileValidationError });
   }
   if (err instanceof multer.MulterError) {
-    return res.status(500).send({ error: err.message });
+    return res.status(400).send({ error: err.message });
   }
-  console.log(err);
   next(err);
 };
 
