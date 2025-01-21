@@ -7,6 +7,7 @@ import cors from "cors";
 import { errorMiddleware } from "./middleware/error.js";
 import userRouter from "./router/userRoute.js";
 import blogRouter from "./router/blogRouter.js";
+import createRouter from "./router/Terms.js";
 import { fileUploadErrorHandler } from "./middleware/multer.js";
 config();
 const app = express();
@@ -46,6 +47,7 @@ app.get("/", (req, res) => {
 });
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/blog", blogRouter);
+app.use("/api/v1/terms", createRouter);
 app.use("/uploads", express.static("uploads"));
 app.use(fileUploadErrorHandler);
 app.use(errorMiddleware);

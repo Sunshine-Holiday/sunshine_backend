@@ -8,7 +8,7 @@ import fs from "fs";  // Ensure fs is imported for file deletion
 export const createBlog = TryCatch(async (req, res, next) => {
   const { title, author, description } = req.body;
   const image = req.file?.path;
-
+// console.log(req.body)
   if (!title || !author || !description) {
     return next(new ErrorHandler("Please fill in all the fields", 400));
   }
@@ -74,8 +74,9 @@ export const getBlogById = TryCatch(async (req, res, next) => {
 export const updateBlog = TryCatch(async (req, res, next) => {
   const { title, author, description } = req.body;
   const {id} = req.params;
-  console.log(id)
   const image = req.file?.path;  // Check if there's a new image
+  // console.log(image)
+  // console.log("hello",req.body)
 // console.log({ title, author, description })
   if (!title || !author || !description) {
     return next(new ErrorHandler("Please fill in all the fields", 400));
