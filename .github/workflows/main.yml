@@ -1,0 +1,39 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main  # Trigger on pushes to the main branch
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Node.js for Backend
+      - name: Set up Node.js for Backend
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      # Step 3: Deploy Backend via SSH
+      - name: Deploy Backend via SSH
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSHKEY }}
+          port: 22
+          script: |
+            # Navigate to the backend directory
+            cd /root/sunshine_backend
+            # Pull the latest changes from the repository
+            git pull origin main
+            # Install backend dependencies
+            npm install
+            # Start the backend server
+            npm run start
