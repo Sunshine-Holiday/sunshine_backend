@@ -21,19 +21,27 @@ jobs:
           node-version: 18
 
       # Step 3: Deploy Backend via SSH
-      - name: Deploy Backend via SSH
-        uses: appleboy/ssh-action@v0.1.6
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSHKEY }}
-          port: 22
-          script: |
-            # Navigate to the backend directory
-            cd /root/sunshine_backend
-            # Pull the latest changes from the repository
-            git pull origin main
-            # Install backend dependencies
-            npm install
-            # Start the backend server
-            npm run start
+   - name: Deploy Backend via SSH
+  uses: appleboy/ssh-action@v0.1.6
+  with:
+    host: ${{ secrets.SSH_HOST }}
+    username: ${{ secrets.SSH_USER }}
+    key: ${{ secrets.SSHKEY }}
+    port: 22
+    script: |
+      # Navigate to the backend directory
+      cd /root/sunshine_backend
+      
+      # Pull the latest changes from the repository
+      git pull origin main
+      
+      # Install backend dependencies
+      npm install
+      
+      # Check if the backend is already running, stop it if it is
+      pm2 list | grep node-app
+      if [ $? -eq 0 ]; then
+        pm2 restart node-app  # Restart the app if it's already running
+      else
+        pm2 start node-app   # Start the app if it's not running
+      fi
