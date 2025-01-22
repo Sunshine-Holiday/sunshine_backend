@@ -42,7 +42,7 @@ const corsOptions = {
 app.use(express.json({ limit: 'Infinity' }));
 app.use(cors(corsOptions));
 app.get("/", (req, res) => {
-  res.send(`<h1>Server is working hello world </h1> ${process.env.FRONTEND_URL}`);
+  res.send(`<h1>Server is working hello world bye </h1> ${process.env.FRONTEND_URL}`);
 });
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/blog", blogRouter);
