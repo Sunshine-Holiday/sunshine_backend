@@ -29,7 +29,7 @@ cloudinary.config({
 const PORT = process.env.PORT;
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigins = [ process.env.FRONTEND_URL];
+    const allowedOrigins = [process.env.FRONTEND_URL];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -39,10 +39,10 @@ const corsOptions = {
   credentials: true, // Allow cookies/credentials to be included in the request
   methods: ["GET", "POST", "PUT", "DELETE"], // Specify allowed HTTP methods
 };
-app.use(express.json({ limit: 'Infinity' }));
+app.use(express.json({ limit: "Infinity" }));
 app.use(cors(corsOptions));
 app.get("/", (req, res) => {
-  res.send(`<h1>Server is working hello  </h1> ${process.env.FRONTEND_URL}`);
+  res.send(`<h1>Server is working , hello  </h1> `);
 });
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/blog", blogRouter);
