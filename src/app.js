@@ -43,10 +43,6 @@ app.use(express.json({ limit: 'Infinity' }));
 app.use(cors(corsOptions));
 app.get("/", (req, res) => {
   res.send("<h1>Server is working</h1>");
-  res.status(err.statusCode).json({
-    success: false,
-    message: "hello world",
-  });
 });
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/blog", blogRouter);
