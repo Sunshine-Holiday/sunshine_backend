@@ -95,7 +95,10 @@ export const updateGalleryItem = async (req, res) => {
 export const deleteGalleryItem = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(id);
+    // console.log(id);
+    if (!id) {
+      res.status(400).json({ message: "id is required" });
+    }
     const item = await GalleryItem.findByIdAndDelete(id);
     if (!item) {
       return res.status(404).json({ message: "Item not found" });
