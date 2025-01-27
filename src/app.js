@@ -13,6 +13,8 @@ import tripRoutes from "./router/tripRoutes.js";
 import bookingRouter from "./router/booking.js";
 import aboutRouter from "./router/aboutRouter.js";
 import { fileUploadErrorHandler } from "./middleware/multer.js";
+import paymentRouter from "./router/payment.js";
+import privacyRouter from "./router/privacyRouter.js";
 config();
 const app = express();
 connectDB(process.env.MONGO_URI);
@@ -51,7 +53,9 @@ app.use("/api/v1/terms", createRouter);
 app.use("/api/v1/gallery", galleryRouter);
 app.use("/api/v1/trips", tripRoutes);
 app.use("/api/v1/about", aboutRouter)
-app.use("/api/v1/booking", bookingRouter);;
+app.use("/api/v1/privacy", privacyRouter)
+app.use("/api/v1/booking", bookingRouter);
+app.use("/api/v1/payment", paymentRouter);
 app.use("/uploads", express.static("uploads"));
 app.use(fileUploadErrorHandler);
 app.use(errorMiddleware);
