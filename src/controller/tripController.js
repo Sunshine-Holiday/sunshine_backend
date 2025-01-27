@@ -81,7 +81,17 @@ export const updateTrip = async (req, res) => {
     amenities,
     boardingPoints,
   } = req.body;
-
+  console.log({
+    title,
+    price,
+    location,
+    duration,
+    startDates,
+    busSize,
+    category,
+    amenities,
+    boardingPoints,
+  })
   // Validate required fields
   if (
     !title ||
@@ -105,7 +115,7 @@ export const updateTrip = async (req, res) => {
       amenities,
       boardingPoints,
     })
-    return res.status(400).json({ message: "Missing required fields" });
+    return res.status(400).json({ message: "Missing required fields " });
   }
 
 

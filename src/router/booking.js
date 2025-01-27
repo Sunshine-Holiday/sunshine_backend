@@ -4,6 +4,7 @@ import {
   updateBooking,
   deleteBooking,
   getBookingById,
+  getAllBookings,
 } from "../controller/booking.js";
 import { adminOnly, isAuthenticated } from "../middleware/auth.js";
 
@@ -11,14 +12,14 @@ const router = express.Router();
 
 // Create a new booking
 router.post("/",isAuthenticated, createBooking);
-
+router.get("/",isAuthenticated,adminOnly, getAllBookings);
 // Update an existing booking
-router.put("/:bookingId",isAuthenticated,adminOnly, updateBooking);
+router.put("/:id",isAuthenticated,adminOnly, updateBooking);
 
 // Delete a booking
-router.delete("/:bookingId", isAuthenticated,adminOnly,deleteBooking);
+router.delete("/:id", isAuthenticated,adminOnly,deleteBooking);
 
 // Get a booking by its id
-router.get("/:bookingId", isAuthenticated,adminOnly, getBookingById);
+router.get("/:id", isAuthenticated,adminOnly, getBookingById);
 
 export default router;
