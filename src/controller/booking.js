@@ -147,10 +147,10 @@ export const deleteBooking = async (req, res) => {
 // Get a booking by its id
 export const getBookingById = async (req, res) => {
   try {
-    const { bookingId } = req.params;
+    const { id } = req.params;
 
     // Find the booking by id and populate trip and user details
-    const booking = await Booking.findById(bookingId)
+    const booking = await Booking.findById(id)
       .populate("trip")
       .populate("user");
 
@@ -158,8 +158,8 @@ export const getBookingById = async (req, res) => {
       console.log("hello ss")
       return res.status(404).json({ message: "Booking not found" });
     }
-
-    return res.status(200).json(booking);
+// console.log(booking)
+    return res.status(200).json({booking});
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: error.message || "Server error" });
@@ -170,7 +170,7 @@ export const getAllBookings = async (req, res) => {
   try {
     // Destructure the filter parameter from the query string
     const { filter } = req.query;
-    console.log(filter);
+    // console.log(filter);
 
     // Prepare the query object
     let query = {};
@@ -215,7 +215,7 @@ export const getAllBookings = async (req, res) => {
     if (!bookings || bookings.length === 0) {
       return res.status(200).json({ message: "No bookings found", bookings });
     }
-    console.log(bookings);
+    // console.log(bookings);
 
     return res.status(200).json({ bookings });
   } catch (error) {
@@ -226,7 +226,7 @@ export const getAllBookings = async (req, res) => {
 
 export const getAllBookingsByUserId = async (req, res) => {
   const { _id } = req.user; // Extract the user ID from the route params
-  console.log("id is required", req.user);
+  // console.log("id is required", req.user);
   if (!_id) {
     return res.status(401).json({ message: "id is required to get access" });
   }

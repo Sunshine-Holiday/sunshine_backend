@@ -22,5 +22,5 @@ router.put("/:id",isAuthenticated,adminOnly, updateBooking);
 router.delete("/:id", isAuthenticated,adminOnly,deleteBooking);
 
 // Get a booking by its id
-router.get("/:id", isAuthenticated,adminOnly, getBookingById);
+router.get("/:id", isAuthenticated, getBookingById);
 export default router;
