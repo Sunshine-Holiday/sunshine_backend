@@ -10,6 +10,7 @@ import blogRouter from "./router/blogRouter.js";
 import createRouter from "./router/Terms.js";
 import galleryRouter from "./router/galleryRoutes.js";
 import tripRoutes from "./router/tripRoutes.js";
+import bookingRouter from "./router/booking.js";
 import aboutRouter from "./router/aboutRouter.js";
 import { fileUploadErrorHandler } from "./middleware/multer.js";
 config();
@@ -49,7 +50,8 @@ app.use("/api/v1/blog", blogRouter);
 app.use("/api/v1/terms", createRouter);
 app.use("/api/v1/gallery", galleryRouter);
 app.use("/api/v1/trips", tripRoutes);
-app.use("/api/v1/about", aboutRouter);
+app.use("/api/v1/about", aboutRouter)
+app.use("/api/v1/booking", bookingRouter);;
 app.use("/uploads", express.static("uploads"));
 app.use(fileUploadErrorHandler);
 app.use(errorMiddleware);
