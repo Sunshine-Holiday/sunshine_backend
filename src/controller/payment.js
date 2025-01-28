@@ -12,6 +12,7 @@ export const createPaymentIntent = TryCatch(async (req, res, next) => {
     amount: amount * 100, // Amount in paise (e.g., 1000 INR = 100000 paise)
     currency: "INR",
     receipt: `receipt_wallet_${Date.now()}`,
+    payment_capture: 1,
   });
 
 

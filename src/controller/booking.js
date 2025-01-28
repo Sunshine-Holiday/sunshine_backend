@@ -235,6 +235,7 @@ export const getAllBookingsByUserId = async (req, res) => {
     const bookings = await Booking.find({ user: _id })
       .populate("trip") // populate trip details
       .populate("user") // populate user details
+      .sort({ createdAt: -1 })
       .exec();
 
     if (!bookings || bookings.length === 0) {
