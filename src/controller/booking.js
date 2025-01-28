@@ -170,7 +170,6 @@ export const getAllBookings = async (req, res) => {
   try {
     // Destructure the filter parameter from the query string
     const { filter } = req.query;
-    // console.log(filter);
 
     // Prepare the query object
     let query = {};
@@ -206,16 +205,16 @@ export const getAllBookings = async (req, res) => {
       query.selectedDate = { $gte: startOfNextDay };
     }
 
-    // Fetch the bookings with applied filter (if any)
+    // Fetch the bookings with applied filter (if any), and sort by descending order of selectedDate
     const bookings = await Booking.find(query)
       .populate("trip") // populate trip details
       .populate("user") // populate user details
+      .sort({ createdAt: -1 }) // Sort in descending order
       .exec();
 
     if (!bookings || bookings.length === 0) {
       return res.status(200).json({ message: "No bookings found", bookings });
     }
-    // console.log(bookings);
 
     return res.status(200).json({ bookings });
   } catch (error) {
@@ -223,6 +222,7 @@ export const getAllBookings = async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error", error });
   }
 };
+
 
 export const getAllBookingsByUserId = async (req, res) => {
   const { _id } = req.user; // Extract the user ID from the route params

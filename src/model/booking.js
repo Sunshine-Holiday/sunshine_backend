@@ -9,21 +9,24 @@ const passengerSchema = new mongoose.Schema({
   address: { type: String, required: true },
 });
 
-const bookingSchema = new mongoose.Schema({
-  trip: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Trip", 
-    required: true,
+const bookingSchema = new mongoose.Schema(
+  {
+    trip: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Trip",
+      required: true,
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    price: { type: String, required: true },
+    passengers: [passengerSchema],
+    selectedDate: { type: Date, required: true },
+    selectedSeats: { type: [String], required: true },
   },
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User", 
-    required: true,
-  },
-  price: { type: String, required: true },
-  passengers: [passengerSchema],
-  selectedDate: { type: Date, required: true },
-  selectedSeats: { type: [String], required: true },
-});
+  { timestamps: true }
+);
 
 export default mongoose.model("Booking", bookingSchema);

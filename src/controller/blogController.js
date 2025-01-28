@@ -2,13 +2,13 @@ import { TryCatch } from "../middleware/error.js";
 import Blog from "../model/blogModel.js";
 import ErrorHandler from "../utils/utilit-class.js";
 import { v2 as cloudinary } from "cloudinary";
-import fs from "fs";  // Ensure fs is imported for file deletion
+import fs from "fs"; // Ensure fs is imported for file deletion
 
 // Create a new blog with image upload to Cloudinary
 export const createBlog = TryCatch(async (req, res, next) => {
   const { title, author, description } = req.body;
   const image = req.file?.path;
-// console.log(req.body)
+  // console.log(req.body)
   if (!title || !author || !description) {
     return next(new ErrorHandler("Please fill in all the fields", 400));
   }
@@ -40,7 +40,7 @@ export const createBlog = TryCatch(async (req, res, next) => {
 
 // Get all blogs
 export const getAllBlogs = TryCatch(async (req, res, next) => {
-  const blogs = await Blog.find();
+  const blogs = await Blog.find().sort({ createdAt: -1 });
 
   if (!blogs || blogs.length === 0) {
     return next(new ErrorHandler("No blogs found", 404));
@@ -55,9 +55,9 @@ export const getAllBlogs = TryCatch(async (req, res, next) => {
 // Get a blog by its ID
 export const getBlogById = TryCatch(async (req, res, next) => {
   const { id } = req.params;
- if (!id) {
+  if (!id) {
     return next(new ErrorHandler("id not found", 404));
- }
+  }
   const blog = await Blog.findById(id);
 
   if (!blog) {
@@ -73,11 +73,11 @@ export const getBlogById = TryCatch(async (req, res, next) => {
 // Update a blog, including image update to Cloudinary
 export const updateBlog = TryCatch(async (req, res, next) => {
   const { title, author, description } = req.body;
-  const {id} = req.params;
-  const image = req.file?.path;  // Check if there's a new image
+  const { id } = req.params;
+  const image = req.file?.path; // Check if there's a new image
   // console.log(image)
   // console.log("hello",req.body)
-// console.log({ title, author, description })
+  // console.log({ title, author, description })
   if (!title || !author || !description) {
     return next(new ErrorHandler("Please fill in all the fields", 400));
   }

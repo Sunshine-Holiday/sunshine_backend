@@ -43,7 +43,7 @@ export const createGalleryItem = async (req, res) => {
 
 export const getGalleryItems = async (req, res) => {
   try {
-    const items = await GalleryItem.find();
+    const items = await GalleryItem.find().sort({ createdAt: -1 });
     res.status(200).json(items);
   } catch (error) {
     console.error(error);

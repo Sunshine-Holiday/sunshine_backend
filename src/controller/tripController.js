@@ -33,11 +33,9 @@ export const createTrip = async (req, res) => {
 
     // Further validation for boardingPoints (must be an array with at least one element)
     if (!Array.isArray(boardingPoints) || boardingPoints.length === 0) {
-      return res
-        .status(400)
-        .json({
-          message: "Boarding points must be an array with at least one entry",
-        });
+      return res.status(400).json({
+        message: "Boarding points must be an array with at least one entry",
+      });
     }
 
     // Create a new trip if all required fields are present
@@ -52,7 +50,7 @@ export const createTrip = async (req, res) => {
 
 export const getAllTrips = async (req, res) => {
   try {
-    const trips = await Trip.find();
+    const trips = await Trip.find().sort({ createdAt: -1 });
     res.status(200).json(trips);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -91,7 +89,7 @@ export const updateTrip = async (req, res) => {
     category,
     amenities,
     boardingPoints,
-  })
+  });
   // Validate required fields
   if (
     !title ||
@@ -114,18 +112,15 @@ export const updateTrip = async (req, res) => {
       category,
       amenities,
       boardingPoints,
-    })
+    });
     return res.status(400).json({ message: "Missing required fields " });
   }
 
-
   // Further validation for boardingPoints (must be an array with at least one element)
   if (!Array.isArray(boardingPoints) || boardingPoints.length === 0) {
-    return res
-      .status(400)
-      .json({
-        message: "Boarding points must be an array with at least one entry",
-      });
+    return res.status(400).json({
+      message: "Boarding points must be an array with at least one entry",
+    });
   }
 
   try {
