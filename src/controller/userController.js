@@ -8,8 +8,9 @@ import {
   generateOTP,
   resetPasswordHTML,
 } from "../utils/userUtils.js";
-import ErrorHandler from "../utils/utilit-class.js";
+import ErrorHandler, { deleteImage } from "../utils/utilit-class.js";
 import sendToken from "../utils/sendToken.js";
+
 
 export const register = TryCatch(async (req, res, next) => {
   const { username, email, password, phone } = req.body;
@@ -352,29 +353,23 @@ export const getAllUserDetails = TryCatch(async (req, res, next) => {
 });
 
 // admin -- single user Details
-export const getSingleUserDetail = TryCatch(
-  async (req, res, next) => {
-    const { id } = req.params;
-    // console.log(req.query)
-    if (!id) {
-      return next(
-        new ErrorHandler("Id is required to access user Details", 400)
-      );
-    }
-
-    const user = await User.findById(id);
-    if (!user) {
-      return next(
-        new ErrorHandler("Id is invalid to access user Details", 400)
-      );
-    }
-    return res.status(200).json({
-      message: " user  found successfull",
-      success: true,
-      user,
-    });
+export const getSingleUserDetail = TryCatch(async (req, res, next) => {
+  const { id } = req.params;
+  // console.log(req.query)
+  if (!id) {
+    return next(new ErrorHandler("Id is required to access user Details", 400));
   }
-);
+
+  const user = await User.findById(id);
+  if (!user) {
+    return next(new ErrorHandler("Id is invalid to access user Details", 400));
+  }
+  return res.status(200).json({
+    message: " user  found successfull",
+    success: true,
+    user,
+  });
+});
 
 export const updateSingleUserDetails = TryCatch(async (req, res, next) => {
   const { id } = req.params;
@@ -425,5 +420,39 @@ export const deleteUser = TryCatch(async (req, res, next) => {
   return res.status(200).json({
     message: "User deleted successfully",
     success: true,
+  });
+});
+
+
+export const updateProfilePic = TryCatch(async (req, res, next) => {
+  const file = req.file;
+  const id = req.user?._id;
+
+  if (!id) {
+    return next(new ErrorHandler("ID is required to update the profile pic", 400));
+  }
+
+  if (!file || !file.path) {
+    return next(new ErrorHandler("Image is required to update the profile pic", 400));
+  }
+
+  // Find the user to get the existing profile picture
+  const user = await User.findById(id);
+
+  if (!user) {
+    return next(new ErrorHandler("User not found", 404));
+  }
+
+  deleteImage(user.profile)
+
+  // Update the user profile picture
+  user.profile = file.path;
+  await user.save();
+
+  return res.status(200).json({
+    message: "User profile pic updated successfully",
+    success: true,
+    profile: user.profile,
+   
   });
 });

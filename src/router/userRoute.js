@@ -11,14 +11,17 @@ import {
   register,
   resetPassword,
   updateProfile,
+  updateProfilePic,
   updateSingleUserDetails,
   verifyEmailOTP,
 } from "../controller/userController.js";
 import { adminOnly, isAuthenticated } from "../middleware/auth.js";
+import upload from "../middleware/multer.js";
 
 const userRouter = Router();
 // send email  for contact
 userRouter.post("/contact", contact);
+userRouter.put("/profile-pic",isAuthenticated,upload,updateProfilePic)
 
 // created signin  route
 userRouter.post("/login", login);
@@ -36,7 +39,6 @@ userRouter.put("/reset-password", resetPassword);
 userRouter
   .get("/profile", isAuthenticated, getMyProfile)
   .put("/profile", isAuthenticated, updateProfile);
-
 
 
   // admin ----
