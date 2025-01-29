@@ -21,7 +21,7 @@ export const createTrip = async (req, res) => {
       !title ||
       !price ||
       !location ||
-      !duration ||
+    
       !startDates ||
       !busSize ||
       !category ||
@@ -95,7 +95,7 @@ export const updateTrip = async (req, res) => {
     !title ||
     !price ||
     !location ||
-    !duration ||
+ 
     !startDates ||
     !busSize ||
     !category ||
