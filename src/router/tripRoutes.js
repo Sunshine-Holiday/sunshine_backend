@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.post('/',isAuthenticated,adminOnly, createTrip);
 router.get('/', getAllTrips);
-router.get('/:id',isAuthenticated, getTripById);
+router.get('/:id', getTripById);
 router.put('/:id',isAuthenticated,adminOnly, updateTrip);
 router.delete('/:id', isAuthenticated,adminOnly,deleteTrip);
 
