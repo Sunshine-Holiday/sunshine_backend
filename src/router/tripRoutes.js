@@ -10,6 +10,6 @@ router.post('/',isAuthenticated,adminOnly, createTrip);
 router.get('/', getAllTrips);
 router.get('/:id', getTripById);
 router.put('/:id',isAuthenticated,adminOnly, updateTrip);
-router.delete('/:id', isAuthenticated,adminOnly,deleteTrip);
+router.delete('/trip/:id', isAuthenticated,adminOnly,deleteTrip);
 
 export default router;

@@ -12,6 +12,7 @@ import { adminOnly, isAuthenticated } from "../middleware/auth.js";
 const router = express.Router();
 
 router.get("/user", isAuthenticated, getAllBookingsByUserId);
+router.delete("/:id", isAuthenticated,adminOnly,deleteBooking);
 // Create a new booking
 router.post("/",isAuthenticated, createBooking);
 router.get("/",isAuthenticated,adminOnly, getAllBookings);
@@ -19,7 +20,6 @@ router.get("/",isAuthenticated,adminOnly, getAllBookings);
 router.put("/:id",isAuthenticated,adminOnly, updateBooking);
 
 // Delete a booking
-router.delete("/:id", isAuthenticated,adminOnly,deleteBooking);
 
 // Get a booking by its id
 router.get("/:id", isAuthenticated, getBookingById);
