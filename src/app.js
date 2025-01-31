@@ -32,7 +32,7 @@ cloudinary.config({
 const PORT = process.env.PORT;
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigins = [process.env.FRONTEND_URL,process.env.FRONTEND_URL2];
+    const allowedOrigins = [process.env.FRONTEND_URL,process.env.FRONTEND_URL2,process.env.FRONTEND_URL3];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
