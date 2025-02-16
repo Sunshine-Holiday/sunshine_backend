@@ -8,7 +8,7 @@ export const createTrip = async (req, res) => {
       title,
       price,
       location,
-      duration,
+      description,
       startDates,
       busSize,
       category,
@@ -21,7 +21,7 @@ export const createTrip = async (req, res) => {
       !title ||
       !price ||
       !location ||
-    
+      !description ||
       !startDates ||
       !busSize ||
       !category ||
@@ -39,7 +39,17 @@ export const createTrip = async (req, res) => {
     }
 
     // Create a new trip if all required fields are present
-    const trip = new Trip(req.body);
+    const trip = new Trip({
+      title,
+      price,
+      location,
+      description,
+      startDates,
+      busSize,
+      category,
+      amenities,
+      boardingPoints,
+    });
     const savedTrip = await trip.save();
     res.status(201).json(savedTrip);
   } catch (error) {
@@ -72,7 +82,7 @@ export const updateTrip = async (req, res) => {
     title,
     price,
     location,
-    duration,
+    description,
     startDates,
     busSize,
     category,
@@ -83,7 +93,7 @@ export const updateTrip = async (req, res) => {
     title,
     price,
     location,
-    duration,
+    description,
     startDates,
     busSize,
     category,
@@ -95,7 +105,7 @@ export const updateTrip = async (req, res) => {
     !title ||
     !price ||
     !location ||
- 
+    !description ||
     !startDates ||
     !busSize ||
     !category ||
@@ -106,7 +116,7 @@ export const updateTrip = async (req, res) => {
       title,
       price,
       location,
-      duration,
+      description,
       startDates,
       busSize,
       category,
@@ -124,9 +134,23 @@ export const updateTrip = async (req, res) => {
   }
 
   try {
-    const updatedTrip = await Trip.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
+    const updatedTrip = await Trip.findByIdAndUpdate(
+      req.params.id,
+      {
+        title,
+        price,
+        location,
+        description,
+        startDates,
+        busSize,
+        category,
+        amenities,
+        boardingPoints,
+      },
+      {
+        new: true,
+      }
+    );
     if (!updatedTrip)
       return res.status(404).json({ message: "Trip not found" });
     res.status(200).json(updatedTrip);
@@ -137,11 +161,11 @@ export const updateTrip = async (req, res) => {
 
 export const deleteTrip = async (req, res) => {
   try {
-const id=req.params.id
-console.log(id)
-if (!id) {
-  res.status(401).json({ message: "id not found" });
-}
+    const id = req.params.id;
+    console.log(id);
+    if (!id) {
+      res.status(401).json({ message: "id not found" });
+    }
     const deletedTrip = await Trip.findByIdAndDelete(req.params.id);
 
     if (!deletedTrip)
