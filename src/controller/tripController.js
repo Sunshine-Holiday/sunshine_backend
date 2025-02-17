@@ -15,6 +15,17 @@ export const createTrip = async (req, res) => {
       amenities,
       boardingPoints,
     } = req.body;
+    console.log({
+      title,
+      price,
+      location,
+      description,
+      startDates,
+      busSize,
+      category,
+      amenities,
+      boardingPoints,
+    })
 
     // Validate required fields
     if (

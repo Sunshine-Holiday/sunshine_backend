@@ -1,10 +1,11 @@
 // models/Trip.js
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const boardingPointSchema = new mongoose.Schema({
   location: { type: String, required: true },
   time: { type: String, required: true },
   details: { type: String, required: true },
+  maplink: { type: String, required: true },
 });
 
 const tripSchema = new mongoose.Schema({
@@ -19,4 +20,4 @@ const tripSchema = new mongoose.Schema({
   boardingPoints: [boardingPointSchema],
 });
 
-export default mongoose.model('Trip', tripSchema);
+export default mongoose.model("Trip", tripSchema);

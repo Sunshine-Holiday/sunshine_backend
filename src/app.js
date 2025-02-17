@@ -48,10 +48,10 @@ app.get("/", (req, res) => {
   res.send(`<h1>Server is working </h1> `);
 });
 app.use("/api/v1/user", userRouter);
+app.use("/api/v1/trips", tripRoutes);
 app.use("/api/v1/blog", blogRouter);
 app.use("/api/v1/terms", createRouter);
 app.use("/api/v1/gallery", galleryRouter);
-app.use("/api/v1/trips", tripRoutes);
 app.use("/api/v1/about", aboutRouter)
 app.use("/api/v1/privacy", privacyRouter)
 app.use("/api/v1/booking", bookingRouter);
