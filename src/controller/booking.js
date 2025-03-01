@@ -97,7 +97,7 @@ export const updateBooking = async (req, res) => {
     // Find the booking by id
     const booking = await Booking.findById(bookingId);
     if (!booking) {
-      console.log("hello")
+      console.log("hello");
       return res.status(404).json({ message: "Booking not found" });
     }
 
@@ -133,7 +133,7 @@ export const deleteBooking = async (req, res) => {
     // Find and delete the booking
     const booking = await Booking.findByIdAndDelete(bookingId);
     if (!booking) {
-      console.log("hello")
+      console.log("hello");
       return res.status(404).json({ message: "Booking not found" });
     }
 
@@ -155,11 +155,11 @@ export const getBookingById = async (req, res) => {
       .populate("user");
 
     if (!booking) {
-      console.log("hello ss")
+      console.log("hello ss");
       return res.status(404).json({ message: "Booking not found" });
     }
-// console.log(booking)
-    return res.status(200).json({booking});
+    // console.log(booking)
+    return res.status(200).json({ booking });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: error.message || "Server error" });
@@ -223,10 +223,9 @@ export const getAllBookings = async (req, res) => {
   }
 };
 
-
 export const getAllBookingsByUserId = async (req, res) => {
   const { _id } = req.user; // Extract the user ID from the route params
-  // console.log("id is required", req.user);
+  console.log("id is required", req.user);
   if (!_id) {
     return res.status(401).json({ message: "id is required to get access" });
   }
@@ -248,12 +247,225 @@ export const getAllBookingsByUserId = async (req, res) => {
     res.status(200).json({ success: true, bookings });
   } catch (error) {
     console.error("Error fetching bookings:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch bookings",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch bookings",
+      error: error.message,
+    });
+  }
+};
+
+// export const getTripBookingStats = async (req, res) => {
+//   try {
+//     const { tripId } = req.params;
+
+//     if (!tripId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Trip ID is required'
+//       });
+//     }
+
+//     // Get all bookings for this trip
+//     const bookings = await Booking.find({ trip: tripId });
+
+//     // Get unique users
+//     const uniqueUserIds = [...new Set(bookings.map(booking => booking.user.toString()))];
+
+//     // Calculate total number of passengers across all bookings
+//     const totalPassengers = bookings.reduce((total, booking) =>
+//       total + booking.passengers.length, 0);
+
+//     // Calculate total number of seats booked
+//     const totalSeatsBooked = bookings.reduce((total, booking) =>
+//       total + booking.selectedSeats.length, 0);
+
+//     return res.status(200).json({
+//       success: true,
+//       stats: {
+//         uniqueUsers: uniqueUserIds.length,
+//         totalBookings: bookings.length,
+//         totalPassengers,
+//         totalSeatsBooked
+//       },
+//       message: `${uniqueUserIds.length} users have made ${bookings.length} bookings for this trip`
+//     });
+//   } catch (error) {
+//     console.error('Error getting trip booking statistics:', error);
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Failed to get trip booking statistics',
+//       error: error.message
+//     });
+//   }
+// };
+
+// Get bookings by trip ID
+
+export const getBookingsByTrip = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    if (!tripId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Trip ID is required" });
+    }
+
+    const bookings = await Booking.find({ trip: tripId })
+      .populate("user")
+      .populate("trip");
+
+    return res.status(200).json({ success: true, bookings });
+  } catch (error) {
+    console.error("Error fetching bookings:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch bookings",
+      error: error.message,
+    });
+  }
+};
+
+// Get trip booking statistics
+
+export const getTripBookingStats = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    console.log(tripId);
+    if (!tripId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Trip ID is required" });
+    }
+
+    const bookings = await Booking.find({ trip: tripId });
+
+    if (!bookings.length) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No bookings found for this trip" });
+    }
+
+    const uniqueUserIds = [
+      ...new Set(bookings.map((booking) => booking.user.toString())),
+    ];
+    const totalPassengers = bookings.reduce(
+      (total, booking) => total + booking.passengers.length,
+      0
+    );
+    const totalSeatsBooked = bookings.reduce(
+      (total, booking) => total + booking.selectedSeats.length,
+      0
+    );
+
+    // Group bookings by date
+    const dailyStats = bookings.reduce((acc, booking) => {
+      const date = booking.selectedDate.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+      if (!acc[date]) {
+        acc[date] = {
+          totalBookings: 0,
+          totalPassengers: 0,
+          totalSeatsBooked: 0,
+        };
+      }
+      acc[date].totalBookings += 1;
+      acc[date].totalPassengers += booking.passengers.length;
+      acc[date].totalSeatsBooked += booking.selectedSeats.length;
+      return acc;
+    }, {});
+
+    return res.status(200).json({
+      success: true,
+      stats: {
+        uniqueUsers: uniqueUserIds.length,
+        totalBookings: bookings.length,
+        totalPassengers,
+        totalSeatsBooked,
+        dailyStats, // Booking stats per day
+      },
+      message: `${uniqueUserIds.length} users have made ${bookings.length} bookings for this trip`,
+    });
+  } catch (error) {
+    console.error("Error getting trip booking statistics:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get trip booking statistics",
+      error: error.message,
+    });
+  }
+};
+
+export const getTripBookingHistory = async (req, res) => {
+  try {
+    const { id, date } = req.params; // Get trip ID and selected date from params
+
+    if (!id) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Trip ID is required" });
+    }
+    if (!date) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Date is required" });
+    }
+
+    // Convert date param to a Date object and normalize it
+    const inputDate = date; // Given input
+    const timePart = "T18:30:00.000+00:00"; // Fixed time format
+    const formattedDate = `${inputDate}${timePart}`;
+    const selectedDate = formattedDate;
+    const dataDate = selectedDate.toLocaleString()
+
+    console.log(selectedDate);
+    // Find any booking that matches the trip ID and date
+    const booking = await Booking.findOne({ trip: id, selectedDate: dataDate })
+      .populate("trip")
+      .populate("user");
+
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No bookings found for this date" });
+    }
+
+    // Fetch all bookings for the same trip on the selected date
+    const tripBookings = await Booking.find({
+      trip: id,
+      selectedDate: dataDate,
+    }).populate("user");
+
+    // Construct purchase history details
+    const purchaseHistory = tripBookings.map((booking) => ({
+      bookingId: booking._id,
+      user: {
+        id: booking.user._id,
+        name: booking.user.name,
+        email: booking.user.email,
+      },
+      totalPassengers: booking.passengers.length,
+      selectedSeats: booking.selectedSeats,
+      price: booking.price,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      tripDetails: {
+        tripId: booking.trip._id,
+        tripName: booking.trip.name,
+        tripDestination: booking.trip.destination,
+        tripDate: booking.trip.date,
+      },
+      selectedDate: date,
+      purchaseHistory, // List of all bookings on the selected date
+      message: `Purchase history for trip ID ${booking.trip._id} on ${date} retrieved successfully.`,
+    });
+  } catch (error) {
+    console.error("Error getting trip booking history:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get trip booking history",
+      error: error.message,
+    });
   }
 };
