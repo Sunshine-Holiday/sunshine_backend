@@ -9,12 +9,11 @@ import {
   getTripBookingStats,
   getBookingsByTrip,
   getTripBookingHistory,
+  getTripBookingStatsOfTrip,
 } from "../controller/booking.js";
 import { adminOnly, isAuthenticated } from "../middleware/auth.js";
 
 const router = express.Router();
-
-
 
 router.get("/user", isAuthenticated, getAllBookingsByUserId);
 // Admin-only booking operations
@@ -28,7 +27,7 @@ router.get("/trip/:tripId", getBookingsByTrip);
 router.get("/stats/:tripId", getTripBookingStats);
 router.get("/history/:id/:date", getTripBookingHistory);
 // User-specific bookings
-
+router.get("/stats/trip-date/:tripId", isAuthenticated, getTripBookingStatsOfTrip);
 // Create a new booking
 router.post("/", isAuthenticated, createBooking);
 

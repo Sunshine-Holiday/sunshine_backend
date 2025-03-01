@@ -415,7 +415,7 @@ export const getTripBookingHistory = async (req, res) => {
     const timePart = "T18:30:00.000+00:00"; // Fixed time format
     const formattedDate = `${inputDate}${timePart}`;
     const selectedDate = formattedDate;
-    const dataDate = selectedDate.toLocaleString()
+    const dataDate = selectedDate.toLocaleString();
 
     console.log(selectedDate);
     // Find any booking that matches the trip ID and date
@@ -465,6 +465,80 @@ export const getTripBookingHistory = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to get trip booking history",
+      error: error.message,
+    });
+  }
+};
+
+export const getTripBookingStatsOfTrip = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const { selectedDate: querySelectedDate } = req.query;
+    
+    if (!tripId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Trip ID is required" });
+    }
+    
+    const filter = { trip: tripId };
+    
+    // Handle date filtering if provided
+    if (querySelectedDate) {
+      // Format the date with the fixed time part
+      const timePart = "T18:30:00.000+00:00";
+      const formattedDate = `${querySelectedDate}${timePart}`;
+      
+      // Use the formatted date string for exact matching
+      filter.selectedDate = new Date(formattedDate);
+    }
+    
+    const bookings = await Booking.find(filter);
+    
+    if (!bookings.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No bookings found for this trip and date",
+      });
+    }
+    
+    // Calculate booking statistics
+    const uniqueUserIds = [
+      ...new Set(bookings.map((booking) => booking.user.toString())),
+    ];
+    
+    const totalPassengers = bookings.reduce(
+      (total, booking) => total + booking.passengers.length,
+      0
+    );
+    
+    const totalSeatsBooked = bookings.reduce(
+      (total, booking) => total + booking.selectedSeats.length,
+      0
+    );
+    
+    // Get all selected seats across bookings
+    const allSelectedSeats = bookings.flatMap(booking => booking.selectedSeats);
+    
+    return res.status(200).json({
+      success: true,
+      stats: {
+        uniqueUsers: uniqueUserIds.length,
+        totalBookings: bookings.length,
+        totalPassengers,
+        totalSeatsBooked,
+      },
+      selectedSeats: allSelectedSeats,
+      selectedDate: querySelectedDate ? querySelectedDate : "all dates",
+      message: `For trip ${tripId} on ${
+        querySelectedDate || "all dates"
+      }: ${totalSeatsBooked} seats booked`,
+    });
+  } catch (error) {
+    console.error("Error getting trip booking statistics:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get trip booking statistics",
       error: error.message,
     });
   }
