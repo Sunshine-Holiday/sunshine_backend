@@ -6,41 +6,52 @@ export const createGalleryItem = async (req, res) => {
   try {
     const { mediaType, location, date } = req.body;
     const file = req.file;
-    console.log(file, req.body);
-    if (!file) return res.status(400).json({ message: "No file uploaded" });
 
-    let uploadedFile;
-    if (mediaType === "image") {
-      uploadedFile = await cloudinary.uploader.upload(file.path, {
-        folder: "travels",
-      });
-    } else if (mediaType === "video") {
-      uploadedFile = await cloudinary.uploader.upload(file.path, {
-        folder: "travels",
-      });
+    // Log inputs for debugging
+    console.log("req.file:", file);
+    console.log("req.body:", req.body);
+
+    // Validate inputs
+    if (!file) return res.status(400).json({ message: "No file uploaded" });
+    if (!["image", "video"].includes(mediaType)) {
+      return res.status(400).json({ message: "Invalid media type. Use 'image' or 'video'" });
+    }
+    if (!location || !date) {
+      return res.status(400).json({ message: "Location and date are required" });
     }
 
-    // Delete the uploaded file from the local server
-    fs.unlinkSync(file.path);
+    // Validate date
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ message: "Invalid date format" });
+    }
 
+    // Explicitly map file properties
+    const fileData = {
+      originalName: file.originalname,
+      path: file.path,
+      mimeType: file.mimetype,
+      size: file.size,
+    };
+
+    // Log mapped data for debugging
+    console.log("Mapped file data:", fileData);
+
+    // Create and save new gallery item
     const newItem = new GalleryItem({
       mediaType,
-      file: {
-        public_id: uploadedFile.public_id,
-        url: uploadedFile.secure_url,
-      },
+      ...fileData, // Spread fileData to match schema structure
       location,
-      date,
+      date: parsedDate,
     });
 
     await newItem.save();
     res.status(201).json(newItem);
   } catch (error) {
-    console.error(error);
+    console.error("Error in createGalleryItem:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
-
+}; 
 export const getGalleryItems = async (req, res) => {
   try {
     const items = await GalleryItem.find().sort({ createdAt: -1 });
@@ -105,7 +116,7 @@ export const deleteGalleryItem = async (req, res) => {
     }
 
     // Optional: Delete the media file from Cloudinary
-    await cloudinary.uploader.destroy(item.file.public_id);
+    // await cloudinary.uploader.destroy(item.file.public_id);
 
     res.status(200).json({ message: "Item deleted successfully" });
   } catch (error) {
