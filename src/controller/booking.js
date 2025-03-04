@@ -1,6 +1,8 @@
 import Booking from "../model/booking.js";
 import Trip from "../model/Trip.js";
 import User from "../model/userModel.js";
+import { sendMail } from "../utils/sendOTP.js";
+import { generateBookingConfirmationHTML } from "../utils/userUtils.js";
 
 // Helper function to validate trip existence
 const validateTrip = async (tripId, res) => {
@@ -73,6 +75,21 @@ export const createBooking = async (req, res) => {
 
     // Save the booking
     await newBooking.save();
+    
+    console.log("Booking created successfully",user.email);
+  const htmlContent = generateBookingConfirmationHTML(newBooking, user);
+    await sendMail({
+      email: user.email,
+      subject: "Booking Confirmation",
+      html: htmlContent,
+    
+    });
+    await sendMail({
+      email: "sunshineholidaypackages48@gmail.com",
+      subject: "Booking Confirmation",
+      html: htmlContent,
+    
+    });
     return res.status(201).json(newBooking);
   } catch (error) {
     console.error(error);
