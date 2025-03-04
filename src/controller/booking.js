@@ -358,9 +358,15 @@ export const getTripBookingStats = async (req, res) => {
       0
     );
 
-    // Group bookings by date
+    // Group bookings by date with +1 day
     const dailyStats = bookings.reduce((acc, booking) => {
-      const date = booking.selectedDate.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+      // Create a new date object and add 1 day
+      const nextDay = new Date(booking.selectedDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      
+      // Format the date to YYYY-MM-DD
+      const date = nextDay.toISOString().split("T")[0];
+      
       if (!acc[date]) {
         acc[date] = {
           totalBookings: 0,
@@ -381,7 +387,7 @@ export const getTripBookingStats = async (req, res) => {
         totalBookings: bookings.length,
         totalPassengers,
         totalSeatsBooked,
-        dailyStats, // Booking stats per day
+        dailyStats, // Booking stats per day (shifted forward by 1 day)
       },
       message: `${uniqueUserIds.length} users have made ${bookings.length} bookings for this trip`,
     });
@@ -394,7 +400,6 @@ export const getTripBookingStats = async (req, res) => {
     });
   }
 };
-
 export const getTripBookingHistory = async (req, res) => {
   try {
     const { id, date } = req.params; // Get trip ID and selected date from params
@@ -415,9 +420,14 @@ export const getTripBookingHistory = async (req, res) => {
     const timePart = "T18:30:00.000+00:00"; // Fixed time format
     const formattedDate = `${inputDate}${timePart}`;
     const selectedDate = formattedDate;
-    const dataDate = selectedDate.toLocaleString();
-
+    const dateObj = new Date(selectedDate);
+    dateObj.setDate(dateObj.getDate() - 1);
+    const result = dateObj.toISOString().replace('Z', '+00:00');
     console.log(selectedDate);
+    console.log(result);
+    const dataDate = result;
+
+    // console.log(selectedDate,"");
     // Find any booking that matches the trip ID and date
     const booking = await Booking.findOne({ trip: id, selectedDate: dataDate })
       .populate("trip")
@@ -474,52 +484,54 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
   try {
     const { tripId } = req.params;
     const { selectedDate: querySelectedDate } = req.query;
-    
+
     if (!tripId) {
       return res
         .status(400)
         .json({ success: false, message: "Trip ID is required" });
     }
-    
+
     const filter = { trip: tripId };
-    
+
     // Handle date filtering if provided
     if (querySelectedDate) {
       // Format the date with the fixed time part
       const timePart = "T18:30:00.000+00:00";
       const formattedDate = `${querySelectedDate}${timePart}`;
-      
+
       // Use the formatted date string for exact matching
       filter.selectedDate = new Date(formattedDate);
     }
-    
+
     const bookings = await Booking.find(filter);
-    
+
     if (!bookings.length) {
       return res.status(404).json({
         success: false,
         message: "No bookings found for this trip and date",
       });
     }
-    
+
     // Calculate booking statistics
     const uniqueUserIds = [
       ...new Set(bookings.map((booking) => booking.user.toString())),
     ];
-    
+
     const totalPassengers = bookings.reduce(
       (total, booking) => total + booking.passengers.length,
       0
     );
-    
+
     const totalSeatsBooked = bookings.reduce(
       (total, booking) => total + booking.selectedSeats.length,
       0
     );
-    
+
     // Get all selected seats across bookings
-    const allSelectedSeats = bookings.flatMap(booking => booking.selectedSeats);
-    
+    const allSelectedSeats = bookings.flatMap(
+      (booking) => booking.selectedSeats
+    );
+
     return res.status(200).json({
       success: true,
       stats: {
