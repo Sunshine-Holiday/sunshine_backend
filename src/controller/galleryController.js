@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from "cloudinary";
 import GalleryItem from "../model/GalleryItem.js";
 import fs from "fs";
+import { deleteVideo } from "../utils/utilit-class.js";
 
 export const createGalleryItem = async (req, res) => {
   try {
@@ -111,6 +112,7 @@ export const deleteGalleryItem = async (req, res) => {
       res.status(400).json({ message: "id is required" });
     }
     const item = await GalleryItem.findByIdAndDelete(id);
+    deleteVideo(item.path)
     if (!item) {
       return res.status(404).json({ message: "Item not found" });
     }

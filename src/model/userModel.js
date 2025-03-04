@@ -34,9 +34,9 @@ const userSchema = new Schema(
       select: false,
     },
     profile: {
+      type: String,
+    },
 
-   type: String },
- 
     emailVerified: {
       type: Boolean,
       default: false,
