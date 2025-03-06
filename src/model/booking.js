@@ -1,12 +1,12 @@
 import mongoose from "mongoose";
 
 const passengerSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  age: { type: String, required: true },
-  gender: { type: String, required: true },
-  idProof: { type: String, required: true },
-  idProofNumber: { type: String, required: true },
-  address: { type: String, required: true },
+  name: { type: String, required: false },
+  age: { type: String, required: false },
+  gender: { type: String, required: false },
+  idProof: { type: String, required: false },
+  idProofNumber: { type: String, required: false },
+  address: { type: String, required: false },
 });
 
 const bookingSchema = new mongoose.Schema(

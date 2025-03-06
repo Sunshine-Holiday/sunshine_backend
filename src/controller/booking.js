@@ -24,21 +24,11 @@ const validateUser = async (userId, res) => {
 
 // Helper function to check required fields
 const checkRequiredFields = (fields, res) => {
-  const { tripId, userId, price, passengers, selectedDate, selectedSeats } =
-    fields;
+  const { tripId, userId, price, selectedDate, selectedSeats } = fields;
 
   //   console.log({ tripId, userId, price, passengers, selectedDate, selectedSeats })
-  if (passengers?.length === 0) {
-    return res.status(400).json({ message: "Missing required fields" });
-  }
-  if (
-    !tripId ||
-    !userId ||
-    !price ||
-    !passengers ||
-    !selectedDate ||
-    !selectedSeats
-  ) {
+
+  if (!tripId || !userId || !price || !selectedDate || !selectedSeats) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 };
@@ -46,12 +36,12 @@ const checkRequiredFields = (fields, res) => {
 // Create a new booking
 export const createBooking = async (req, res) => {
   try {
-    const { tripId, price, passengers, selectedDate, selectedSeats } = req.body;
+    const { tripId, price, selectedDate,passengers, selectedSeats } = req.body;
     const userId = req.user._id;
     // Check for required fields
     // console.log(req.body)
     const missingFieldsError = checkRequiredFields(
-      { tripId, userId, price, passengers, selectedDate, selectedSeats },
+      { tripId, userId, price, selectedDate, selectedSeats },
       res
     );
     if (missingFieldsError) return missingFieldsError;
@@ -68,27 +58,25 @@ export const createBooking = async (req, res) => {
       trip: tripId,
       user: userId,
       price,
-      passengers,
+      passengers:passengers,
       selectedDate,
       selectedSeats,
     });
 
     // Save the booking
     await newBooking.save();
-    
-    console.log("Booking created successfully",user.email);
-  const htmlContent = generateBookingConfirmationHTML(newBooking, user);
+
+    console.log("Booking created successfully", user.email);
+    const htmlContent = generateBookingConfirmationHTML(newBooking, user);
     await sendMail({
       email: user.email,
       subject: "Booking Confirmation",
       html: htmlContent,
-    
     });
     await sendMail({
       email: "sunshineholidaypackages48@gmail.com",
       subject: "Booking Confirmation",
       html: htmlContent,
-    
     });
     return res.status(201).json(newBooking);
   } catch (error) {
@@ -241,27 +229,34 @@ export const getAllBookings = async (req, res) => {
 };
 
 export const getAllBookingsByUserId = async (req, res) => {
-  const { _id } = req.user; // Extract the user ID from the route params
+  const { _id } = req.user; // Extract the user ID from the request
   console.log("id is required", req.user);
+  
   if (!_id) {
     return res.status(401).json({ message: "id is required to get access" });
   }
+  
   try {
-    // Fetch all bookings for the given user ID and populate related fields
+    // Fetch all bookings for the given user ID
     const bookings = await Booking.find({ user: _id })
-      .populate("trip") // populate trip details
-      .populate("user") // populate user details
+      .populate({
+        path: 'trip',
+        // Only populate if trip exists
+        match: { _id: { $exists: true } }
+      })
+      .populate("user")
       .sort({ createdAt: -1 })
       .exec();
-
-    if (!bookings || bookings.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No bookings found for this user." });
+    
+    // Filter out bookings where trip is null/undefined (i.e., trip doesn't exist)
+    const validBookings = bookings.filter(booking => booking.trip !== null);
+    
+    if (!validBookings || validBookings.length === 0) {
+      return res.status(200).json({ success: true, bookings: [] });
     }
-
-    // Return the list of bookings
-    res.status(200).json({ success: true, bookings });
+    
+    // Return the list of valid bookings
+    res.status(200).json({ success: true, bookings: validBookings });
   } catch (error) {
     console.error("Error fetching bookings:", error);
     res.status(500).json({
@@ -271,7 +266,6 @@ export const getAllBookingsByUserId = async (req, res) => {
     });
   }
 };
-
 // export const getTripBookingStats = async (req, res) => {
 //   try {
 //     const { tripId } = req.params;
@@ -377,11 +371,13 @@ export const getTripBookingStats = async (req, res) => {
 
     // Group bookings by date with +1 day
     const dailyStats = bookings.reduce((acc, booking) => {
-      const [day, month, year] = booking.selectedDate.split('-');
+      const [day, month, year] = booking.selectedDate.split("-");
       const dateObj = new Date(year, month - 1, day);
       dateObj.setDate(dateObj.getDate());
-      const nextDay = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${dateObj.getFullYear()}`;
-      
+      const nextDay = `${String(dateObj.getDate()).padStart(2, "0")}-${String(
+        dateObj.getMonth() + 1
+      ).padStart(2, "0")}-${dateObj.getFullYear()}`;
+
       if (!acc[nextDay]) {
         acc[nextDay] = {
           totalBookings: 0,
@@ -399,9 +395,11 @@ export const getTripBookingStats = async (req, res) => {
     const sortedDailyStats = Object.entries(dailyStats)
       .map(([date, stats]) => ({ date, ...stats }))
       .sort((a, b) => {
-        const [dayA, monthA, yearA] = a.date.split('-').map(Number);
-        const [dayB, monthB, yearB] = b.date.split('-').map(Number);
-        return new Date(yearB, monthB - 1, dayB) - new Date(yearA, monthA - 1, dayA);
+        const [dayA, monthA, yearA] = a.date.split("-").map(Number);
+        const [dayB, monthB, yearB] = b.date.split("-").map(Number);
+        return (
+          new Date(yearB, monthB - 1, dayB) - new Date(yearA, monthA - 1, dayA)
+        );
       });
 
     console.log(sortedDailyStats);
@@ -429,7 +427,7 @@ export const getTripBookingStats = async (req, res) => {
 export const getTripBookingHistory = async (req, res) => {
   try {
     const { id, date } = req.params; // Get trip ID and selected date from params
-console.log(date)
+    console.log(date);
     if (!id) {
       return res
         .status(400)
@@ -458,7 +456,7 @@ console.log(date)
     const booking = await Booking.findOne({ trip: id, selectedDate: dataDate })
       .populate("trip")
       .populate("user");
-console.log(dataDate)
+    console.log(dataDate);
     if (!booking) {
       return res
         .status(404)
@@ -510,7 +508,7 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
   try {
     const { tripId } = req.params;
     const { selectedDate: querySelectedDate } = req.query;
-console.log(querySelectedDate)
+    console.log(querySelectedDate);
     if (!tripId) {
       return res
         .status(400)
@@ -521,10 +519,8 @@ console.log(querySelectedDate)
 
     // Handle date filtering if provided
     if (querySelectedDate) {
-   
-
       // Use the formatted date string for exact matching
-      filter.selectedDate = querySelectedDate
+      filter.selectedDate = querySelectedDate;
     }
 
     const bookings = await Booking.find(filter);

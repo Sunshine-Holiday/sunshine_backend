@@ -9,6 +9,7 @@ const boardingPointSchema = new mongoose.Schema({
 });
 
 const tripSchema = new mongoose.Schema({
+  banner:{ type: String, required: true },
   title: { type: String, required: true },
   price: { type: String, required: true },
   location: { type: String, required: true },
