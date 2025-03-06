@@ -15,6 +15,7 @@ export const createTrip = async (req, res) => {
       amenities,
       boardingPoints,
     } = req.body;
+    
     console.log({
       title,
       price,
@@ -25,7 +26,7 @@ export const createTrip = async (req, res) => {
       category,
       amenities,
       boardingPoints,
-    })
+    });
 
     // Validate required fields
     if (
@@ -42,25 +43,25 @@ export const createTrip = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    // Further validation for boardingPoints (must be an array with at least one element)
+    // Validate boardingPoints
     if (!Array.isArray(boardingPoints) || boardingPoints.length === 0) {
       return res.status(400).json({
         message: "Boarding points must be an array with at least one entry",
       });
     }
 
-    // Create a new trip if all required fields are present
     const trip = new Trip({
       title,
       price,
       location,
       description,
-      startDates,
+      startDates, // Now expects a string like "05-03-25, 06-03-25, ..."
       busSize,
       category,
       amenities,
       boardingPoints,
     });
+    
     const savedTrip = await trip.save();
     res.status(201).json(savedTrip);
   } catch (error) {

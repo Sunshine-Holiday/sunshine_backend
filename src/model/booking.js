@@ -23,7 +23,7 @@ const bookingSchema = new mongoose.Schema(
     },
     price: { type: String, required: true },
     passengers: [passengerSchema],
-    selectedDate: { type: Date, required: true },
+    selectedDate: { type: String, required: true },
     selectedSeats: { type: [String], required: true },
   },
   { timestamps: true }

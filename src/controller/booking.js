@@ -375,25 +375,30 @@ export const getTripBookingStats = async (req, res) => {
       0
     );
 
-    // Group bookings by date with +1 day
+    // Group bookings by date with +1 day, handling DD-MM-YYYY format
     const dailyStats = bookings.reduce((acc, booking) => {
-      // Create a new date object and add 1 day
-      const nextDay = new Date(booking.selectedDate);
-      nextDay.setDate(nextDay.getDate() + 1);
+      // Assuming booking.selectedDate is in DD-MM-YYYY format from database
+      const [day, month, year] = booking.selectedDate.split('-');
       
-      // Format the date to YYYY-MM-DD
-      const date = nextDay.toISOString().split("T")[0];
+      // Create date object (month - 1 because JS months are 0-based)
+      const dateObj = new Date(year, month - 1, day);
       
-      if (!acc[date]) {
-        acc[date] = {
+      // Add 1 day
+      dateObj.setDate(dateObj.getDate() );
+      
+      // Format back to DD-MM-YYYY
+      const nextDay = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${dateObj.getFullYear()}`;
+      
+      if (!acc[nextDay]) {
+        acc[nextDay] = {
           totalBookings: 0,
           totalPassengers: 0,
           totalSeatsBooked: 0,
         };
       }
-      acc[date].totalBookings += 1;
-      acc[date].totalPassengers += booking.passengers.length;
-      acc[date].totalSeatsBooked += booking.selectedSeats.length;
+      acc[nextDay].totalBookings += 1;
+      acc[nextDay].totalPassengers += booking.passengers.length;
+      acc[nextDay].totalSeatsBooked += booking.selectedSeats.length;
       return acc;
     }, {});
 
@@ -404,7 +409,7 @@ export const getTripBookingStats = async (req, res) => {
         totalBookings: bookings.length,
         totalPassengers,
         totalSeatsBooked,
-        dailyStats, // Booking stats per day (shifted forward by 1 day)
+        dailyStats, // Booking stats per day in DD-MM-YYYY format (shifted forward by 1 day)
       },
       message: `${uniqueUserIds.length} users have made ${bookings.length} bookings for this trip`,
     });
@@ -420,7 +425,7 @@ export const getTripBookingStats = async (req, res) => {
 export const getTripBookingHistory = async (req, res) => {
   try {
     const { id, date } = req.params; // Get trip ID and selected date from params
-
+console.log(date)
     if (!id) {
       return res
         .status(400)
@@ -434,22 +439,22 @@ export const getTripBookingHistory = async (req, res) => {
 
     // Convert date param to a Date object and normalize it
     const inputDate = date; // Given input
-    const timePart = "T18:30:00.000+00:00"; // Fixed time format
-    const formattedDate = `${inputDate}${timePart}`;
-    const selectedDate = formattedDate;
-    const dateObj = new Date(selectedDate);
-    dateObj.setDate(dateObj.getDate() - 1);
-    const result = dateObj.toISOString().replace('Z', '+00:00');
-    console.log(selectedDate);
-    console.log(result);
-    const dataDate = result;
+    // const timePart = "T18:30:00.000+00:00"; // Fixed time format
+    // const formattedDate = `${inputDate}${timePart}`;
+    // const selectedDate = formattedDate;
+    // const dateObj = new Date(selectedDate);
+    // dateObj.setDate(dateObj.getDate() - 1);
+    // const result = dateObj.toISOString().replace('Z', '+00:00');
+    // console.log(selectedDate);
+    // console.log(result);
+    const dataDate = inputDate;
 
     // console.log(selectedDate,"");
     // Find any booking that matches the trip ID and date
     const booking = await Booking.findOne({ trip: id, selectedDate: dataDate })
       .populate("trip")
       .populate("user");
-
+console.log(dataDate)
     if (!booking) {
       return res
         .status(404)
@@ -501,7 +506,7 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
   try {
     const { tripId } = req.params;
     const { selectedDate: querySelectedDate } = req.query;
-
+console.log(querySelectedDate)
     if (!tripId) {
       return res
         .status(400)
@@ -512,12 +517,10 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
 
     // Handle date filtering if provided
     if (querySelectedDate) {
-      // Format the date with the fixed time part
-      const timePart = "T18:30:00.000+00:00";
-      const formattedDate = `${querySelectedDate}${timePart}`;
+   
 
       // Use the formatted date string for exact matching
-      filter.selectedDate = new Date(formattedDate);
+      filter.selectedDate = querySelectedDate
     }
 
     const bookings = await Booking.find(filter);

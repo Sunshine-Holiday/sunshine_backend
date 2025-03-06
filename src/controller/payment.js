@@ -5,7 +5,7 @@ import ErrorHandler from "../utils/utilit-class.js";
 
 export const createPaymentIntent = TryCatch(async (req, res, next) => {
   const { amount } = req.body;
-
+console.log(amount)
   if (!amount) return next(new ErrorHandler("Please enter amount", 400));
 
   const paymentDetail = await razorpay.orders.create({
@@ -15,7 +15,7 @@ export const createPaymentIntent = TryCatch(async (req, res, next) => {
     payment_capture: 1,
   });
 
-
+console.log(paymentDetail)
   return res.status(201).json({
     success: true,
     paymentDetail
