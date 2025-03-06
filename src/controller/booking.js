@@ -375,18 +375,11 @@ export const getTripBookingStats = async (req, res) => {
       0
     );
 
-    // Group bookings by date with +1 day, handling DD-MM-YYYY format
+    // Group bookings by date with +1 day
     const dailyStats = bookings.reduce((acc, booking) => {
-      // Assuming booking.selectedDate is in DD-MM-YYYY format from database
       const [day, month, year] = booking.selectedDate.split('-');
-      
-      // Create date object (month - 1 because JS months are 0-based)
       const dateObj = new Date(year, month - 1, day);
-      
-      // Add 1 day
-      dateObj.setDate(dateObj.getDate() );
-      
-      // Format back to DD-MM-YYYY
+      dateObj.setDate(dateObj.getDate());
       const nextDay = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${dateObj.getFullYear()}`;
       
       if (!acc[nextDay]) {
@@ -402,6 +395,17 @@ export const getTripBookingStats = async (req, res) => {
       return acc;
     }, {});
 
+    // Convert to array and sort by date descending
+    const sortedDailyStats = Object.entries(dailyStats)
+      .map(([date, stats]) => ({ date, ...stats }))
+      .sort((a, b) => {
+        const [dayA, monthA, yearA] = a.date.split('-').map(Number);
+        const [dayB, monthB, yearB] = b.date.split('-').map(Number);
+        return new Date(yearB, monthB - 1, dayB) - new Date(yearA, monthA - 1, dayA);
+      });
+
+    console.log(sortedDailyStats);
+
     return res.status(200).json({
       success: true,
       stats: {
@@ -409,7 +413,7 @@ export const getTripBookingStats = async (req, res) => {
         totalBookings: bookings.length,
         totalPassengers,
         totalSeatsBooked,
-        dailyStats, // Booking stats per day in DD-MM-YYYY format (shifted forward by 1 day)
+        dailyStats: sortedDailyStats,
       },
       message: `${uniqueUserIds.length} users have made ${bookings.length} bookings for this trip`,
     });
