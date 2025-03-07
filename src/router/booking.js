@@ -13,6 +13,8 @@ import {
   processRefund,
   requestRefund,
   getProcessingBookings,
+  updateBookingSeats,
+  deleteBookingSeats,
 } from "../controller/booking.js";
 import { adminOnly, isAuthenticated } from "../middleware/auth.js";
 
@@ -38,7 +40,8 @@ router.get(
 // Create a new booking
 router.post("/", isAuthenticated, createBooking);
 router.post("/request", isAuthenticated, requestRefund);
-
+router.put("/update/:bookingId", isAuthenticated, updateBookingSeats);
+router.delete("/delete/:bookingId", isAuthenticated, deleteBookingSeats);
 // Admin routes
 router.post("/process", isAuthenticated, adminOnly, processRefund);
 

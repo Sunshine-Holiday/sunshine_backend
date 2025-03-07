@@ -712,3 +712,133 @@ export const getProcessingBookings = async (req, res) => {
     // throw error;
   }
 };
+
+export const updateBookingSeats = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { oldSeat, newSeat } = req.body;
+    console.log(req.body)
+console.log({oldSeat, newSeat,bookingId})
+    // Validate input
+    if (!bookingId || !oldSeat || !newSeat) {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking ID, old seat number, and new seat number are required'
+      });
+    }
+
+    // Find the booking
+    const booking = await Booking.findById(bookingId)
+      .populate('trip')
+      .populate('user');
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    // Check if old seat exists in the booking
+    const seatIndex = booking.selectedSeats.indexOf(oldSeat);
+    if (seatIndex === -1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Old seat number not found in this booking'
+      });
+    }
+
+    // Get trip details to validate seat availability
+    const trip = booking.trip;
+    const totalSeats = trip.totalSeats || 31; // Default to 31 if not specified
+
+    // Validate new seat
+    if (parseInt(newSeat) > totalSeats || parseInt(newSeat) < 1) {
+      return res.status(400).json({
+        success: false,
+        message: `New seat number must be between 1 and ${totalSeats}`
+      });
+    }
+
+    // Check if new seat is already booked (across all bookings for this trip)
+    const conflictingBooking = await Booking.findOne({
+      trip: trip._id,
+      selectedSeats: newSeat,
+      _id: { $ne: bookingId }, // Exclude current booking
+      selectedDate: booking.selectedDate
+    });
+
+    if (conflictingBooking) {
+      return res.status(400).json({
+        success: false,
+        message: 'New seat number is already booked'
+      });
+    }
+
+    // Update the seat
+    booking.selectedSeats[seatIndex] = newSeat;
+    await booking.save();
+
+    // Return updated booking
+    return res.status(200).json({
+      success: true,
+      message: 'Seat updated successfully',
+      data: {
+        bookingId: booking._id,
+        oldSeat,
+        newSeat,
+        selectedSeats: booking.selectedSeats
+      }
+    });
+
+  } catch (error) {
+    console.error('Error updating booking seats:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+export const deleteBookingSeats = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    // Validate input
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking ID is required'
+      });
+    }
+
+    // Find and delete the booking
+    const booking = await Booking.findByIdAndDelete(bookingId);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      message: 'Booking deleted successfully',
+      data: {
+        bookingId: booking._id,
+        deletedSeats: booking.selectedSeats
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deleting booking:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
