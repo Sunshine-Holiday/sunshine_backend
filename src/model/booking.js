@@ -25,6 +25,11 @@ const bookingSchema = new mongoose.Schema(
     passengers: [passengerSchema],
     selectedDate: { type: String, required: true },
     selectedSeats: { type: [String], required: true },
+    status: { 
+      type: String, 
+      enum: ['confirmed', "processing",'refund', 'resolved'], // Allowed values
+      default: 'confirmed' // Default value
+    }
   },
   { timestamps: true }
 );

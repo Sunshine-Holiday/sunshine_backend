@@ -17,7 +17,7 @@ const tripSchema = new mongoose.Schema({
   startDates: { type: [String], required: true },
   busSize: { type: String, required: true },
   category: { type: String, required: true },
-  amenities: { type: [String], required: true },
+  amenities: { type: [String]},
   boardingPoints: [boardingPointSchema],
 });
 

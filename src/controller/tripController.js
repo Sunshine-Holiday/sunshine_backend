@@ -83,7 +83,7 @@ export const createTrip = async (req, res) => {
       !parsedStartDates ||
       !busSize ||
       !category ||
-      !parsedAmenities ||
+
       !parsedBoardingPoints
     ) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -217,7 +217,7 @@ export const updateTrip = async (req, res) => {
     !parsedStartDates ||
     !busSize ||
     !category ||
-    !parsedAmenities ||
+
     !parsedBoardingPoints
   ) {
     console.log({
@@ -231,6 +231,7 @@ export const updateTrip = async (req, res) => {
       parsedAmenities,
       parsedBoardingPoints,
     });
+    console.log("dasd")
     return res.status(400).json({ message: "Missing required fields " });
   }
 

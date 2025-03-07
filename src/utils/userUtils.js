@@ -242,3 +242,202 @@ export const generateBookingConfirmationHTML = (booking, user) => {
     </html>
   `;
 };
+
+
+export const generateRefundRequestHTML = (booking, user, reason) => {
+  // Format the request date
+  const formattedRequestDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 0;
+          background-color: #f4f4f4;
+        }
+        .container {
+          max-width: 600px;
+          margin: 20px auto;
+          background-color: #ffffff;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+          background-color: #2196F3;
+          color: white;
+          padding: 20px;
+          text-align: center;
+        }
+        .content {
+          padding: 20px;
+        }
+        .refund-details {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 15px;
+          margin: 15px 0;
+        }
+        .original-booking {
+          margin: 10px 0;
+          padding: 10px;
+          background-color: #f9f9f9;
+          border-radius: 4px;
+        }
+        .footer {
+          padding: 20px;
+          text-align: center;
+          color: #666;
+          font-size: 12px;
+          background-color: #f4f4f4;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Refund Request Confirmation</h1>
+        </div>
+        <div class="content">
+          <h2>Hello ${user.username || "Traveler"},</h2>
+          <p>We have received your refund request. Our team will review it and get back to you soon. Here are the details:</p>
+          
+          <div class="refund-details">
+            <h3>Refund Request Details</h3>
+            <p><strong>Booking ID:</strong> ${booking._id}</p>
+            <p><strong>Request Date:</strong> ${formattedRequestDate}</p>
+            // <p><strong>Reason for Refund:</strong> ${reason}</p>
+            <p><strong>Current Status:</strong> Processing</p>
+            <p><strong>Original Amount:</strong> Rs ${booking.price}</p>
+          </div>
+
+          <div class="original-booking">
+            <h3>Original Booking Summary</h3>
+            <p><strong>Trip Date:</strong> ${new Date(booking.selectedDate).toLocaleDateString("en-US")}</p>
+            <p><strong>Selected Seats:</strong> ${booking.selectedSeats.join(", ")}</p>
+          </div>
+
+          <p>Please allow 5-7 business days for us to process your refund request. You'll receive another email once it's been reviewed.</p>
+          <p>If you have any urgent queries, please quote your Booking ID: ${booking._id}</p>
+        </div>
+        <div class="footer">
+          <p>Thank you for your patience!</p>
+          <p>If you have any questions, contact us at sunshineholidaypackages@gmail.com</p>
+          <p>© ${new Date().getFullYear()} <strong>Sunshine Holiday Packages</strong>. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+export const generateRefundProcessedHTML = (booking, user) => {
+  // Format the processed date
+  const formattedProcessedDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  // Format the original trip date
+  const formattedTripDate = new Date(booking.selectedDate).toLocaleDateString("en-US");
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 0;
+          background-color: #f4f4f4;
+        }
+        .container {
+          max-width: 600px;
+          margin: 20px auto;
+          background-color: #ffffff;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+          background-color: #4CAF50;
+          color: white;
+          padding: 20px;
+          text-align: center;
+        }
+        .content {
+          padding: 20px;
+        }
+        .refund-details {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 15px;
+          margin: 15px 0;
+        }
+        .original-booking {
+          margin: 10px 0;
+          padding: 10px;
+          background-color: #f9f9f9;
+          border-radius: 4px;
+        }
+        .footer {
+          padding: 20px;
+          text-align: center;
+          color: #666;
+          font-size: 12px;
+          background-color: #f4f4f4;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Refund Processed Successfully</h1>
+        </div>
+        <div class="content">
+          <h2>Hello ${user.username || "Traveler"},</h2>
+          <p>Good news! Your refund has been successfully processed. Here are the details:</p>
+          
+          <div class="refund-details">
+            <h3>Refund Details</h3>
+            <p><strong>Booking ID:</strong> ${booking._id}</p>
+            <p><strong>Processed Date:</strong> ${formattedProcessedDate}</p>
+            <p><strong>Refunded Amount:</strong> Rs ${booking.price}</p>
+            <p><strong>Status:</strong> Resolved</p>
+          </div>
+
+          <div class="original-booking">
+            <h3>Original Booking Summary</h3>
+            <p><strong>Trip Date:</strong> ${formattedTripDate}</p>
+            <p><strong>Selected Seats:</strong> ${booking.selectedSeats.join(", ")}</p>
+          </div>
+
+          <p>The refunded amount should reflect in your original payment method within 3-5 business days, depending on your bank/card provider.</p>
+          <p>If you don't see the refund within this timeframe, please contact us with your Booking ID: ${booking._id}</p>
+        </div>
+        <div class="footer">
+          <p>We hope to serve you again in the future!</p>
+          <p>If you have any questions, contact us at sunshineholidaypackages@gmail.com</p>
+          <p>© ${new Date().getFullYear()} <strong>Sunshine Holiday Packages</strong>. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};

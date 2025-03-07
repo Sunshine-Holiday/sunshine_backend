@@ -2,7 +2,7 @@ import Booking from "../model/booking.js";
 import Trip from "../model/Trip.js";
 import User from "../model/userModel.js";
 import { sendMail } from "../utils/sendOTP.js";
-import { generateBookingConfirmationHTML } from "../utils/userUtils.js";
+import { generateBookingConfirmationHTML, generateRefundProcessedHTML, generateRefundRequestHTML } from "../utils/userUtils.js";
 
 // Helper function to validate trip existence
 const validateTrip = async (tripId, res) => {
@@ -36,7 +36,7 @@ const checkRequiredFields = (fields, res) => {
 // Create a new booking
 export const createBooking = async (req, res) => {
   try {
-    const { tripId, price, selectedDate,passengers, selectedSeats } = req.body;
+    const { tripId, price, selectedDate, passengers, selectedSeats } = req.body;
     const userId = req.user._id;
     // Check for required fields
     // console.log(req.body)
@@ -58,7 +58,7 @@ export const createBooking = async (req, res) => {
       trip: tripId,
       user: userId,
       price,
-      passengers:passengers,
+      passengers: passengers,
       selectedDate,
       selectedSeats,
     });
@@ -231,30 +231,30 @@ export const getAllBookings = async (req, res) => {
 export const getAllBookingsByUserId = async (req, res) => {
   const { _id } = req.user; // Extract the user ID from the request
   console.log("id is required", req.user);
-  
+
   if (!_id) {
     return res.status(401).json({ message: "id is required to get access" });
   }
-  
+
   try {
     // Fetch all bookings for the given user ID
     const bookings = await Booking.find({ user: _id })
       .populate({
-        path: 'trip',
+        path: "trip",
         // Only populate if trip exists
-        match: { _id: { $exists: true } }
+        match: { _id: { $exists: true } },
       })
       .populate("user")
       .sort({ createdAt: -1 })
       .exec();
-    
+
     // Filter out bookings where trip is null/undefined (i.e., trip doesn't exist)
-    const validBookings = bookings.filter(booking => booking.trip !== null);
-    
+    const validBookings = bookings.filter((booking) => booking.trip !== null);
+
     if (!validBookings || validBookings.length === 0) {
       return res.status(200).json({ success: true, bookings: [] });
     }
-    
+
     // Return the list of valid bookings
     res.status(200).json({ success: true, bookings: validBookings });
   } catch (error) {
@@ -573,5 +573,142 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
       message: "Failed to get trip booking statistics",
       error: error.message,
     });
+  }
+};
+
+export const requestRefund = async (req, res) => {
+  try {
+    const { bookingId, reason } = req.body;
+
+    if (!bookingId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Booking ID is required" });
+    }
+
+    const booking = await Booking.findById(bookingId);
+
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    // Check if booking belongs to current user
+    if (booking.user.toString() !== req.user._id.toString()) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Unauthorized to request refund for this booking",
+        });
+    }
+
+    // Check if booking is eligible for refund (not already in refund process)
+    if (booking.status === "refund" || booking.status === "resolved") {
+      return res.status(400).json({
+        success: false,
+        message: `Refund already ${
+          booking.status === "refund" ? "processing" : "resolved"
+        }`,
+      });
+    }
+
+    // Update booking status to refund
+    booking.status = "processing";
+    await booking.save();
+
+    // You might want to create a separate refund model to track refund details
+    // For now, we'll just update the booking status
+    const html = generateRefundRequestHTML(booking, req.user, reason);
+    await sendMail({
+      email: req.user.email,
+      html,
+      subject: "Refund Request Confirmation - Sunshine Holiday Packages",
+      from: "sunshineholidaypackages48@gmail.com",
+    });
+    await sendMail({
+      email:"sunshineholidaypackages48@gmail.com",
+      html,
+      subject: "Refund Request Confirmation - Sunshine Holiday Packages",
+      from: "sunshineholidaypackages48@gmail.com",
+    });
+    return res.status(200).json({
+      success: true,
+      message: "Refund request submitted successfully",
+      booking,
+    });
+  } catch (error) {
+    console.error("Error requesting refund:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const processRefund = async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+
+    if (!bookingId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Booking ID is required" });
+    }
+
+    // Populate the 'user' field to get user data, including email
+    const booking = await Booking.findById(bookingId).populate("user");
+
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+ 
+    // Update booking status to resolved
+    booking.status = "resolved";
+
+    await booking.save();
+
+    const html = generateRefundProcessedHTML(booking, booking.user);
+    await sendMail({
+      email: booking.user.email, // Access email from populated user
+      html,
+      subject: "Refund Processed - Sunshine Holiday Packages",
+      from: "sunshineholidaypackages48@gmail.com",
+    });
+    await sendMail({
+      email: "sunshineholidaypackages48@gmail.com",
+      html,
+      subject: "Refund Processed - Sunshine Holiday Packages",
+      from: "sunshineholidaypackages48@gmail.com",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Request to cancellation",
+      booking,
+    });
+  } catch (error) {
+    console.error("Error processing refund:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const getProcessingBookings = async (req, res) => {
+  try {
+    console.log("hello");
+    const processingBookings = await Booking.find({ status: "processing" })
+      .populate("trip") // Populates trip reference
+      .populate("user") // Populates user reference
+      .exec();
+
+    return res.status(200).json({
+      success: true,
+      message: `Request to cancelation`,
+      bookings: processingBookings,
+    });
+  } catch (error) {
+    console.error("Error fetching processing bookings:", error);
+    // throw error;
   }
 };
