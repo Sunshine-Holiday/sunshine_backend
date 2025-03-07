@@ -10,23 +10,27 @@ export const updateTerms = TryCatch(async (req, res, next) => {
     return next(new ErrorHandler("Content is required.", 400));
   }
 
-  // Check if terms already exist
+  // Check if terms already exist (find first document)
   let terms = await Terms.findOne();
 
   if (terms) {
-    // Update existing terms
-    terms.content = content;
-    await terms.save();
+    // Update existing terms using the first found document's ID
+    await Terms.findByIdAndUpdate(
+      terms._id,
+      { content },
+      { new: true, runValidators: true }
+    );
     return res.status(200).json({
       message: "Terms and Conditions updated successfully.",
       success: true,
     });
   }
 
-  // If terms do not exist, respond with an error
-  return res.status(404).json({
-    message: "Terms and Conditions not found.",
-    success: false,
+  // If terms don't exist, create new terms
+  terms = await Terms.create({ content });
+  return res.status(201).json({
+    message: "Terms and Conditions created successfully.",
+    success: true,
   });
 });
 
