@@ -9,7 +9,7 @@ console.log(amount)
   if (!amount) return next(new ErrorHandler("Please enter amount", 400));
 
   const paymentDetail = await razorpay.orders.create({
-    amount: amount * 100, // Amount in paise (e.g., 1000 INR = 100000 paise)
+    amount: amount * 100, // Amount in paise (e.g., 1000 INR = 100000 paise) world
     currency: "INR",
     receipt: `receipt_wallet_${Date.now()}`,
     payment_capture: 1,
