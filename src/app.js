@@ -39,7 +39,7 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-
+console.log("SMTP_USER",process.env.SMTP_USER,);
 // CORS Configuration
 const corsOptions = {
   origin: (origin, callback) => {
