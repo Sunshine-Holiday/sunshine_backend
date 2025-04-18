@@ -90,14 +90,14 @@ export const createTrip = async (req, res) => {
     }
 
     // Validate boardingPoints
-    if (
-      !Array.isArray(parsedBoardingPoints) ||
-      parsedBoardingPoints.length === 0
-    ) {
-      return res.status(400).json({
-        message: "Boarding points must be an array with at least one entry",
-      });
-    }
+    // if (
+    //   !Array.isArray(parsedBoardingPoints) ||
+    //   parsedBoardingPoints.length === 0
+    // ) {
+    //   return res.status(400).json({
+    //     message: "Boarding points must be an array with at least one entry",
+    //   });
+    // }
 
     const trip = new Trip({
       banner: file.path,

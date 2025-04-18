@@ -17,7 +17,7 @@ import bookingRouter from "./router/booking.js";
 import aboutRouter from "./router/aboutRouter.js";
 import paymentRouter from "./router/payment.js";
 import privacyRouter from "./router/privacyRouter.js";
-
+import reviewRouter from "./router/reviewRoutes.js";
 config();
 const app = express();
 const PORT = process.env.PORT;
@@ -77,7 +77,7 @@ app.use("/api/v1/about", aboutRouter);
 app.use("/api/v1/privacy", privacyRouter);
 app.use("/api/v1/booking", bookingRouter);
 app.use("/api/v1/payment", paymentRouter);
-
+app.use("/api/v1/review", reviewRouter);
 // Error Handling
 // app.use(fileUploadErrorHandler);
 app.use(errorMiddleware);
