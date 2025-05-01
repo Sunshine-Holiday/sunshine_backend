@@ -1,11 +1,8 @@
-// controllers/tripController.js
-
 import Trip from "../model/Trip.js";
 
 export const createTrip = async (req, res) => {
   try {
     const file = req.file;
-    console.log(file);
     if (!file || !file.path) {
       return res.status(400).json({ message: "Image required" });
     }
@@ -35,44 +32,37 @@ export const createTrip = async (req, res) => {
       ? JSON.parse(boardingPoints)
       : [];
 
-      const parsedStartDates = Array.isArray(startDates)
+    const parsedStartDates = Array.isArray(startDates)
       ? startDates
       : startDates
       ? (() => {
           try {
-            // First try to parse as JSON
-            return JSON.parse(startDates);
+            const parsed = JSON.parse(startDates);
+            return Array.isArray(parsed) ? parsed : [parsed];
           } catch (e) {
-            // If that fails, try splitting by comma
-            const dates = startDates.split(",").map(date => date.trim());
-            
-            // Check if the first item looks like it contains a JSON array 
-            // (starts with [ and ends with ])
-            if (dates.length === 1 && dates[0].startsWith('[') && dates[0].endsWith(']')) {
-              try {
-                return JSON.parse(dates[0]);
-              } catch (e) {
-                return dates;
-              }
-            }
-            
-            // Remove any extra quotes from each date
-            return dates.map(date => date.replace(/^["']+|["']+$/g, ''));
+            return [];
           }
         })()
       : [];
 
-    console.log({
-      title,
-      price,
-      location,
-      description,
-      parsedStartDates,
-      busSize,
-      category,
-      parsedAmenities,
-      parsedBoardingPoints,
-    });
+    // Validate startDates format and content
+    if (!Array.isArray(parsedStartDates) || parsedStartDates.length === 0) {
+      return res.status(400).json({ message: "Start dates must be a non-empty array" });
+    }
+
+    for (const startDate of parsedStartDates) {
+      if (!startDate.date || !startDate.seats) {
+        return res.status(400).json({ message: "Each start date must have a date and seats" });
+      }
+      if (
+        !(
+          (typeof startDate.seats === "number" && [20, 32].includes(startDate.seats)) ||
+          startDate.seats === "block"
+        )
+      ) {
+        return res.status(400).json({ message: "Seats must be 20, 32, or 'block'" });
+      }
+    }
 
     // Validate required fields
     if (
@@ -80,24 +70,22 @@ export const createTrip = async (req, res) => {
       !price ||
       !location ||
       !description ||
-      !parsedStartDates ||
       !busSize ||
-      !category ||
-
-      !parsedBoardingPoints
+     !category ||
+      !parsedBoardingPoints.length === 0
     ) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     // Validate boardingPoints
-    // if (
-    //   !Array.isArray(parsedBoardingPoints) ||
-    //   parsedBoardingPoints.length === 0
-    // ) {
-    //   return res.status(400).json({
-    //     message: "Boarding points must be an array with at least one entry",
-    //   });
-    // }
+    if (
+      !Array.isArray(parsedBoardingPoints) ||
+      parsedBoardingPoints.length === 0
+    ) {
+      return res.status(400).json({
+        message: "Boarding points must be an array with at least one entry",
+      });
+    }
 
     const trip = new Trip({
       banner: file.path,
@@ -140,8 +128,7 @@ export const getTripById = async (req, res) => {
 };
 
 export const updateTrip = async (req, res) => {
-  const id= req.params.id
-  console.log(id)
+  const id = req.params.id;
   const {
     title,
     price,
@@ -155,6 +142,7 @@ export const updateTrip = async (req, res) => {
   } = req.body;
 
   const file = req.file;
+
   // Parse arrays from form data
   const parsedAmenities = Array.isArray(amenities)
     ? amenities
@@ -168,45 +156,37 @@ export const updateTrip = async (req, res) => {
     ? JSON.parse(boardingPoints)
     : [];
 
-    const parsedStartDates = Array.isArray(startDates)
+  const parsedStartDates = Array.isArray(startDates)
     ? startDates
     : startDates
     ? (() => {
         try {
-          // First try to parse as JSON
-          return JSON.parse(startDates);
+          const parsed = JSON.parse(startDates);
+          return Array.isArray(parsed) ? parsed : [parsed];
         } catch (e) {
-          // If that fails, try splitting by comma
-          const dates = startDates.split(",").map(date => date.trim());
-          
-          // Check if the first item looks like it contains a JSON array 
-          // (starts with [ and ends with ])
-          if (dates.length === 1 && dates[0].startsWith('[') && dates[0].endsWith(']')) {
-            try {
-              return JSON.parse(dates[0]);
-            } catch (e) {
-              return dates;
-            }
-          }
-          
-          // Remove any extra quotes from each date
-          return dates.map(date => date.replace(/^["']+|["']+$/g, ''));
+          return [];
         }
       })()
     : [];
 
-   
-  console.log({
-    title,
-    price,
-    location,
-    description,
-    parsedStartDates,
-    busSize,
-    category,
-    parsedAmenities,
-    parsedBoardingPoints,
-  });
+  // Validate startDates format and content
+  if (!Array.isArray(parsedStartDates) || parsedStartDates.length === 0) {
+    return res.status(400).json({ message: "Start dates must be a non-empty array" });
+  }
+
+  for (const startDate of parsedStartDates) {
+    if (!startDate.date || !startDate.seats) {
+      return res.status(400).json({ message: "Each start date must have a date and seats" });
+    }
+    if (
+      !(
+        (typeof startDate.seats === "number" && [20, 32].includes(startDate.seats)) ||
+        startDate.seats === "block"
+      )
+    ) {
+      return res.status(400).json({ message: "Seats must be 20, 32, or 'block'" });
+    }
+  }
 
   // Validate required fields
   if (
@@ -214,28 +194,14 @@ export const updateTrip = async (req, res) => {
     !price ||
     !location ||
     !description ||
-    !parsedStartDates ||
     !busSize ||
     !category ||
-
-    !parsedBoardingPoints
+    !parsedBoardingPoints.length
   ) {
-    console.log({
-      title,
-      price,
-      location,
-      description,
-      parsedStartDates,
-      busSize,
-      category,
-      parsedAmenities,
-      parsedBoardingPoints,
-    });
-    console.log("dasd")
-    return res.status(400).json({ message: "Missing required fields " });
+    return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // Further validation for boardingPoints (must be an array with at least one element)
+  // Validate boardingPoints
   if (
     !Array.isArray(parsedBoardingPoints) ||
     parsedBoardingPoints.length === 0
@@ -275,12 +241,10 @@ export const updateTrip = async (req, res) => {
 export const deleteTrip = async (req, res) => {
   try {
     const id = req.params.id;
-    console.log(id);
     if (!id) {
-      res.status(401).json({ message: "id not found" });
+      res.status(400).json({ message: "ID not provided" });
     }
-    const deletedTrip = await Trip.findByIdAndDelete(req.params.id);
-
+    const deletedTrip = await Trip.findByIdAndDelete(id);
     if (!deletedTrip)
       return res.status(404).json({ message: "Trip not found" });
     res.status(200).json({ message: "Trip deleted successfully" });

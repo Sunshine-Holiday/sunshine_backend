@@ -1,6 +1,6 @@
 // routes/reviewRoutes.js
 import express from "express";
-import { createReview, getTripReviews } from "../controller/reviewController.js";
+import { createReview, getReviewByBookingId, getTripReviews } from "../controller/reviewController.js";
 
 import { isAuthenticated } from "../middleware/auth.js";
 
@@ -11,5 +11,5 @@ router.post("/", isAuthenticated, createReview);
 
 // Get all reviews for a trip
 router.get("/:tripId", getTripReviews);
-
+router.get("/review/:bookingId", getReviewByBookingId);
 export default router;
