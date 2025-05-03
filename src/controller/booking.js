@@ -2,7 +2,11 @@ import Booking from "../model/booking.js";
 import Trip from "../model/Trip.js";
 import User from "../model/userModel.js";
 import { sendMail } from "../utils/sendOTP.js";
-import { generateBookingConfirmationHTML, generateRefundProcessedHTML, generateRefundRequestHTML } from "../utils/userUtils.js";
+import {
+  generateBookingConfirmationHTML,
+  generateRefundProcessedHTML,
+  generateRefundRequestHTML,
+} from "../utils/userUtils.js";
 
 // Helper function to validate trip existence
 const validateTrip = async (tripId, res) => {
@@ -468,14 +472,14 @@ export const getTripBookingHistory = async (req, res) => {
       trip: id,
       selectedDate: dataDate,
     }).populate("user");
-
+    console.log(tripBookings);
     // Construct purchase history details
     const purchaseHistory = tripBookings.map((booking) => ({
       bookingId: booking._id,
       user: {
-        id: booking.user._id,
-        name: booking.user.name,
-        email: booking.user.email,
+        id: booking?.user?._id || "",
+        name: booking?.user?.name || "",
+        email: booking?.user?.email || "",
       },
       totalPassengers: booking.passengers.length,
       selectedSeats: booking.selectedSeats,
@@ -596,12 +600,10 @@ export const requestRefund = async (req, res) => {
 
     // Check if booking belongs to current user
     if (booking.user.toString() !== req.user._id.toString()) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Unauthorized to request refund for this booking",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to request refund for this booking",
+      });
     }
 
     // Check if booking is eligible for refund (not already in refund process)
@@ -628,7 +630,7 @@ export const requestRefund = async (req, res) => {
       from: "sunshineholidaypackages@gmail.com",
     });
     await sendMail({
-      email:"sunshineholidaypackages@gmail.com",
+      email: "sunshineholidaypackages@gmail.com",
       html,
       subject: "Refund Request Confirmation - Sunshine Holiday Packages",
       from: "sunshineholidaypackages@gmail.com",
@@ -663,7 +665,6 @@ export const processRefund = async (req, res) => {
         .json({ success: false, message: "Booking not found" });
     }
 
- 
     // Update booking status to resolved
     booking.status = "resolved";
 
@@ -717,25 +718,26 @@ export const updateBookingSeats = async (req, res) => {
   try {
     const { bookingId } = req.params;
     const { oldSeat, newSeat } = req.body;
-    console.log(req.body)
-console.log({oldSeat, newSeat,bookingId})
+    console.log(req.body);
+    console.log({ oldSeat, newSeat, bookingId });
     // Validate input
     if (!bookingId || !oldSeat || !newSeat) {
       return res.status(400).json({
         success: false,
-        message: 'Booking ID, old seat number, and new seat number are required'
+        message:
+          "Booking ID, old seat number, and new seat number are required",
       });
     }
 
     // Find the booking
     const booking = await Booking.findById(bookingId)
-      .populate('trip')
-      .populate('user');
+      .populate("trip")
+      .populate("user");
 
     if (!booking) {
       return res.status(404).json({
         success: false,
-        message: 'Booking not found'
+        message: "Booking not found",
       });
     }
 
@@ -744,7 +746,7 @@ console.log({oldSeat, newSeat,bookingId})
     if (seatIndex === -1) {
       return res.status(400).json({
         success: false,
-        message: 'Old seat number not found in this booking'
+        message: "Old seat number not found in this booking",
       });
     }
 
@@ -756,7 +758,7 @@ console.log({oldSeat, newSeat,bookingId})
     if (parseInt(newSeat) > totalSeats || parseInt(newSeat) < 1) {
       return res.status(400).json({
         success: false,
-        message: `New seat number must be between 1 and ${totalSeats}`
+        message: `New seat number must be between 1 and ${totalSeats}`,
       });
     }
 
@@ -765,13 +767,13 @@ console.log({oldSeat, newSeat,bookingId})
       trip: trip._id,
       selectedSeats: newSeat,
       _id: { $ne: bookingId }, // Exclude current booking
-      selectedDate: booking.selectedDate
+      selectedDate: booking.selectedDate,
     });
 
     if (conflictingBooking) {
       return res.status(400).json({
         success: false,
-        message: 'New seat number is already booked'
+        message: "New seat number is already booked",
       });
     }
 
@@ -782,21 +784,20 @@ console.log({oldSeat, newSeat,bookingId})
     // Return updated booking
     return res.status(200).json({
       success: true,
-      message: 'Seat updated successfully',
+      message: "Seat updated successfully",
       data: {
         bookingId: booking._id,
         oldSeat,
         newSeat,
-        selectedSeats: booking.selectedSeats
-      }
+        selectedSeats: booking.selectedSeats,
+      },
     });
-
   } catch (error) {
-    console.error('Error updating booking seats:', error);
+    console.error("Error updating booking seats:", error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error',
-      error: error.message
+      message: "Internal server error",
+      error: error.message,
     });
   }
 };
@@ -809,7 +810,7 @@ export const deleteBookingSeats = async (req, res) => {
     if (!bookingId) {
       return res.status(400).json({
         success: false,
-        message: 'Booking ID is required'
+        message: "Booking ID is required",
       });
     }
 
@@ -819,26 +820,25 @@ export const deleteBookingSeats = async (req, res) => {
     if (!booking) {
       return res.status(404).json({
         success: false,
-        message: 'Booking not found'
+        message: "Booking not found",
       });
     }
 
     // Return success response
     return res.status(200).json({
       success: true,
-      message: 'Booking deleted successfully',
+      message: "Booking deleted successfully",
       data: {
         bookingId: booking._id,
-        deletedSeats: booking.selectedSeats
-      }
+        deletedSeats: booking.selectedSeats,
+      },
     });
-
   } catch (error) {
-    console.error('Error deleting booking:', error);
+    console.error("Error deleting booking:", error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error',
-      error: error.message
+      message: "Internal server error",
+      error: error.message,
     });
   }
 };

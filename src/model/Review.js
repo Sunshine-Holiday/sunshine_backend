@@ -26,6 +26,10 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    bookingDate:{
+      type: String,
+      required: true,
+    },
     isApproved: {
       type: Boolean,
       default: false,
@@ -34,7 +38,8 @@ const reviewSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-   
+    isAdminApproved: { type: Boolean, default: false },
+    isAdminDisApproved: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
