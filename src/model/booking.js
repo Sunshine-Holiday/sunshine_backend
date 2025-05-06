@@ -26,7 +26,7 @@ const bookingSchema = new mongoose.Schema(
     selectedDate: { type: String, required: true },
     selectedSeats: { type: [String], required: true },
     isReview: { type: Boolean, default: false },
-
+    isReviewActivate: { type: Boolean, default: false },
     status: {
       type: String,
       enum: ["confirmed", "processing", "refund", "resolved"], // Allowed values

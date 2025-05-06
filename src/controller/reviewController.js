@@ -2,6 +2,7 @@
 import mongoose from "mongoose";
 import Review from "../model/Review.js";
 import Booking from "../model/booking.js";
+import { TryCatch } from "../middleware/error.js";
 
 export const createReview = async (req, res) => {
   try {
@@ -67,7 +68,7 @@ export const getTripReviews = async (req, res) => {
     const { tripId } = req.params;
 
     const reviews = await Review.find({ trip: tripId })
-      .populate("user", "name")
+      .populate("user", "name",)
       .sort({ createdAt: -1 });
 
     res.status(200).json(reviews);
@@ -79,7 +80,7 @@ export const getTripReviews = async (req, res) => {
 export const getReviewByBookingId = async (req, res) => {
     try {
       const { bookingId } = req.params;
-      
+      console.log(bookingId)
       const review = await Review.findOne({ booking: bookingId });
       
       if (!review) {
@@ -218,7 +219,7 @@ export const deleteReview = async (req, res) => {
   }
 };
 
-// Get a single review by ID
+// Get a single review by IDz
 export const getReviewById = async (req, res) => {
   try {
     const { reviewId } = req.params;
@@ -243,3 +244,81 @@ export const getReviewById = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// const getTripReviews = TryCatch(async (req, res) => {
+//   const { trip } = req.query;
+
+//   if (!trip) {
+//     res.status(400);
+//     throw new Error('Trip ID is required');
+//   }
+
+//   const reviews = await Review.find({ trip })
+//     .populate('user', 'email')
+//     .select('user bookingDate travelDate description status');
+
+//   res.status(200).json({
+//     reviews,
+//     message: reviews.length > 0 ? 'Reviews retrieved successfully' : 'No reviews found for this trip',
+//   });
+// });
+
+// @desc    Update booking (e.g., toggle isReviewActivate)
+// @route   PATCH /api/bookings/:bookingId
+// @access  Private/Admin
+export const updateBooking = TryCatch(async (req, res) => {
+  const { bookingId } = req.params;
+  const { isReviewActivate } = req.body;
+console.log("this is booking", bookingId)
+console.log("this is review", isReviewActivate)
+  if (isReviewActivate === undefined) {
+    res.status(400);
+    throw new Error('isReviewActivate field is required');
+  }
+
+  const booking = await Booking.findById(bookingId);
+
+  if (!booking) {
+    res.status(404);
+    throw new Error('Booking not found');
+  }
+
+  booking.isReviewActivate = isReviewActivate;
+  await booking.save();
+
+  res.status(200).json({
+    booking,
+    message: `Review activation ${isReviewActivate ? 'enabled' : 'disabled'} for booking`,
+  });
+});
+
+// @desc    Update review status
+// @route   PATCH /api/reviews/:reviewId
+// @access  Private/Admin
+export const updateReview = TryCatch(async (req, res) => {
+  const { reviewId } = req.params;
+  const { status } = req.body;
+console.log("this is review", reviewId)
+console.log("this is status", status)
+  const validStatuses = ['pending', 'approved', 'rejected', 'admin_approved', 'admin_rejected'];
+  if (!status || !validStatuses.includes(status)) {
+    res.status(400);
+    throw new Error('Invalid or missing status value');
+  }
+
+  const review = await Review.findById(reviewId);
+
+  if (!review) {
+    res.status(404);
+    throw new Error('Review not found');
+  }
+
+  review.status = status;
+  await review.save();
+
+  res.status(200).json({
+    review,
+    message: `Review status updated to ${status}`,
+  });
+});
+
