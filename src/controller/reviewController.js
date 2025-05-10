@@ -51,9 +51,9 @@ export const createReview = async (req, res) => {
       booking: booking._id,
       travelDate,
       description,
-      bookingDate: booking.selectedDate
+      bookingDate: booking.selectedDate,
     });
-console.log(newReview)
+    console.log(newReview);
     // Update the booking to set isReview to true
     await Booking.findByIdAndUpdate(bookingId, { isReview: true });
 
@@ -68,7 +68,7 @@ export const getTripReviews = async (req, res) => {
     const { tripId } = req.params;
 
     const reviews = await Review.find({ trip: tripId })
-      .populate("user", "name",)
+      .populate("user", "name")
       .sort({ createdAt: -1 });
 
     res.status(200).json(reviews);
@@ -78,33 +78,29 @@ export const getTripReviews = async (req, res) => {
 };
 
 export const getReviewByBookingId = async (req, res) => {
-    try {
-      const { bookingId } = req.params;
-      console.log(bookingId)
-      const review = await Review.findOne({ booking: bookingId });
-      
-      if (!review) {
-        return res.status(404).json({ message: "No review found for this booking" });
-      }
-      
-      res.status(200).json(review);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+  try {
+    const { bookingId } = req.params;
+    console.log(bookingId);
+    const review = await Review.findOne({ booking: bookingId });
+
+    if (!review) {
+      return res
+        .status(404)
+        .json({ message: "No review found for this booking" });
     }
-  };
 
-
-
-
+    res.status(200).json(review);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
 // Get all reviews for a trip by selectedDate (for admin)
-
-
 
 export const getReviewsByTripAndDate = async (req, res) => {
   try {
     const { tripId, selectedDate } = req.params;
-
+    console.log(tripId, selectedDate);
     // Validate trip ID
     if (!mongoose.Types.ObjectId.isValid(tripId)) {
       return res.status(400).json({ message: "Invalid trip ID" });
@@ -118,16 +114,17 @@ export const getReviewsByTripAndDate = async (req, res) => {
         .json({ message: "Invalid date format. Use DD-MM-YYYY" });
     }
 
- 
+    console.log("this is selected date", selectedDate);
 
     // Find reviews for the trip where bookingDate matches the formatted date
     const reviews = await Review.find({
       trip: tripId,
       bookingDate: selectedDate, // Use bookingDate from Review model
     })
-      .populate("user", "name")
-      .populate("booking", "selectedDate")
-      .populate("trip", "name");
+      .populate("user")
+      .populate("booking", "selectedDate selectedSeats passengers price status")
+      .populate("trip", "title")
+      .sort({ createdAt: -1 }); 
 
     if (!reviews.length) {
       return res
@@ -142,10 +139,6 @@ export const getReviewsByTripAndDate = async (req, res) => {
   }
 };
 
-
-
-
-
 // Update review (admin approval/disapproval)
 export const updateReviewStatus = async (req, res) => {
   try {
@@ -159,7 +152,11 @@ export const updateReviewStatus = async (req, res) => {
 
     // Ensure only one status is updated at a time
     if (isAdminApproved !== undefined && isAdminDisApproved !== undefined) {
-      return res.status(400).json({ message: "Cannot set both approval and disapproval at the same time" });
+      return res
+        .status(400)
+        .json({
+          message: "Cannot set both approval and disapproval at the same time",
+        });
     }
 
     const updateFields = {};
@@ -269,18 +266,18 @@ export const getReviewById = async (req, res) => {
 export const updateBooking = TryCatch(async (req, res) => {
   const { bookingId } = req.params;
   const { isReviewActivate } = req.body;
-console.log("this is booking", bookingId)
-console.log("this is review", isReviewActivate)
+  console.log("this is booking", bookingId);
+  console.log("this is review", isReviewActivate);
   if (isReviewActivate === undefined) {
     res.status(400);
-    throw new Error('isReviewActivate field is required');
+    throw new Error("isReviewActivate field is required");
   }
 
   const booking = await Booking.findById(bookingId);
 
   if (!booking) {
     res.status(404);
-    throw new Error('Booking not found');
+    throw new Error("Booking not found");
   }
 
   booking.isReviewActivate = isReviewActivate;
@@ -288,7 +285,9 @@ console.log("this is review", isReviewActivate)
 
   res.status(200).json({
     booking,
-    message: `Review activation ${isReviewActivate ? 'enabled' : 'disabled'} for booking`,
+    message: `Review activation ${
+      isReviewActivate ? "enabled" : "disabled"
+    } for booking`,
   });
 });
 
@@ -297,28 +296,21 @@ console.log("this is review", isReviewActivate)
 // @access  Private/Admin
 export const updateReview = TryCatch(async (req, res) => {
   const { reviewId } = req.params;
-  const { status } = req.body;
-console.log("this is review", reviewId)
-console.log("this is status", status)
-  const validStatuses = ['pending', 'approved', 'rejected', 'admin_approved', 'admin_rejected'];
-  if (!status || !validStatuses.includes(status)) {
-    res.status(400);
-    throw new Error('Invalid or missing status value');
-  }
 
-  const review = await Review.findById(reviewId);
+  const review = await Review.findByIdAndUpdate(reviewId, req.body, {
+    new: true,
+  });
 
   if (!review) {
     res.status(404);
-    throw new Error('Review not found');
+    throw new Error("Review not found");
   }
 
-  review.status = status;
   await review.save();
 
   res.status(200).json({
     review,
-    message: `Review status updated to ${status}`,
+    message: `Review status updated to review`,
+    review,
   });
 });
-

@@ -1,3 +1,4 @@
+import Review from "../model/Review.js";
 import Trip from "../model/Trip.js";
 
 export const createTrip = async (req, res) => {
@@ -117,15 +118,27 @@ export const getAllTrips = async (req, res) => {
   }
 };
 
+
+
 export const getTripById = async (req, res) => {
   try {
     const trip = await Trip.findById(req.params.id);
+
     if (!trip) return res.status(404).json({ message: "Trip not found" });
-    res.status(200).json(trip);
+
+    // Fetch top 10 reviews sorted by bookingDate descending
+    const reviews = await Review.find({ trip: req.params.id })
+      .sort({ bookingDate: -1 }) // descending order
+      .limit(10)
+      .populate("user") // optionally populate user details
+      .populate("booking", "bookingNumber"); // optionally populate booking info
+
+    res.status(200).json({ trip, reviews });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 export const updateTrip = async (req, res) => {
   const id = req.params.id;
