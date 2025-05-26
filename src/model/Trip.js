@@ -4,23 +4,20 @@ import mongoose from "mongoose";
 const boardingPointSchema = new mongoose.Schema({
   location: { type: String, required: true },
   time: { type: String, required: true },
-  details: { type: String, required: true },
+  details: { type: String, required: false },
   maplink: { type: String, required: false },
 });
 
 const startDateSchema = new mongoose.Schema({
   date: { type: String, required: true }, // Store date as string (e.g., "2025-06-01")
   seats: {
-    type: mongoose.Schema.Types.Mixed, // Allow number (32, 20) or string ("block")
+    type: Number, // Changed to Number instead of Mixed
     required: true,
     validate: {
       validator: function (value) {
-        return (
-          (typeof value === "number" && [20, 32].includes(value)) ||
-          value === "block"
-        );
+        return Number.isInteger(value) && value > 0; // Ensure seats is a positive integer
       },
-      message: 'Seats must be 20, 32, or "block"',
+      message: "Seats must be a positive integer",
     },
   },
 });
@@ -31,8 +28,8 @@ const tripSchema = new mongoose.Schema({
   price: { type: String, required: true },
   location: { type: String, required: true },
   description: { type: String, required: true },
-  startDates: [startDateSchema], // Updated to use startDateSchema
-  busSize: { type: String, required: true },
+  startDates: [startDateSchema],
+
   category: { type: String, required: true },
   amenities: { type: [String] },
   boardingPoints: [boardingPointSchema],

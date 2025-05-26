@@ -14,7 +14,7 @@ export const createTrip = async (req, res) => {
       location,
       description,
       startDates,
-      busSize,
+
       category,
       amenities,
       boardingPoints,
@@ -52,16 +52,11 @@ export const createTrip = async (req, res) => {
     }
 
     for (const startDate of parsedStartDates) {
-      if (!startDate.date || !startDate.seats) {
+      if (!startDate.date || startDate.seats === undefined) {
         return res.status(400).json({ message: "Each start date must have a date and seats" });
       }
-      if (
-        !(
-          (typeof startDate.seats === "number" && [20, 32].includes(startDate.seats)) ||
-          startDate.seats === "block"
-        )
-      ) {
-        return res.status(400).json({ message: "Seats must be 20, 32, or 'block'" });
+      if (!Number.isInteger(startDate.seats) || startDate.seats <= 0) {
+        return res.status(400).json({ message: "Seats must be a positive integer" });
       }
     }
 
@@ -70,10 +65,7 @@ export const createTrip = async (req, res) => {
       !title ||
       !price ||
       !location ||
-      !description ||
-      !busSize ||
-     !category ||
-      !parsedBoardingPoints.length === 0
+      !description 
     ) {
       return res.status(400).json({ message: "Missing required fields" });
     }
@@ -95,7 +87,7 @@ export const createTrip = async (req, res) => {
       location,
       description,
       startDates: parsedStartDates,
-      busSize,
+  
       category,
       amenities: parsedAmenities,
       boardingPoints: parsedBoardingPoints,
@@ -148,7 +140,7 @@ export const updateTrip = async (req, res) => {
     location,
     description,
     startDates,
-    busSize,
+
     category,
     amenities,
     boardingPoints,
@@ -188,16 +180,11 @@ export const updateTrip = async (req, res) => {
   }
 
   for (const startDate of parsedStartDates) {
-    if (!startDate.date || !startDate.seats) {
+    if (!startDate.date || startDate.seats === undefined) {
       return res.status(400).json({ message: "Each start date must have a date and seats" });
     }
-    if (
-      !(
-        (typeof startDate.seats === "number" && [20, 32].includes(startDate.seats)) ||
-        startDate.seats === "block"
-      )
-    ) {
-      return res.status(400).json({ message: "Seats must be 20, 32, or 'block'" });
+    if (!Number.isInteger(startDate.seats) || startDate.seats <= 0) {
+      return res.status(400).json({ message: "Seats must be a positive integer" });
     }
   }
 
@@ -205,11 +192,7 @@ export const updateTrip = async (req, res) => {
   if (
     !title ||
     !price ||
-    !location ||
-    !description ||
-    !busSize ||
-    !category ||
-    !parsedBoardingPoints.length
+    !location 
   ) {
     return res.status(400).json({ message: "Missing required fields" });
   }
@@ -234,7 +217,6 @@ export const updateTrip = async (req, res) => {
         location,
         description,
         startDates: parsedStartDates,
-        busSize,
         category,
         amenities: parsedAmenities,
         boardingPoints: parsedBoardingPoints,

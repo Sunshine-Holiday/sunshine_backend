@@ -209,7 +209,9 @@ export const generateBookingConfirmationHTML = (booking, user) => {
           <div class="booking-details">
             <h3>Booking Details</h3>
             <p><strong>Booking ID:</strong> ${booking._id}</p>
-            <p><strong>Trip Date:</strong> ${formattedDate}</p>
+            <p><strong>Trip Date:</strong>${booking?.selectedDate}</p>
+       
+            <p><strong>Booking Date:</strong> ${new Date(booking.createdAt).toLocaleDateString("en-US")}</p>
             <p><strong>Selected Seats:</strong> ${booking.selectedSeats.join(
               ", "
             )}</p>
@@ -316,7 +318,7 @@ export const generateRefundRequestHTML = (booking, user, reason) => {
           <div class="refund-details">
             <h3>Refund Request Details</h3>
             <p><strong>Booking ID:</strong> ${booking._id}</p>
-            <p><strong>Request Date:</strong> ${formattedRequestDate}</p>
+            <p><strong>Request Date:</strong> ${booking?.selectedDate}</p>
             // <p><strong>Reason for Refund:</strong> ${reason}</p>
             <p><strong>Current Status:</strong> Processing</p>
             <p><strong>Original Amount:</strong> Rs ${booking.price}</p>

@@ -485,6 +485,7 @@ export const getTripBookingHistory = async (req, res) => {
       selectedSeats: booking.selectedSeats,
       price: booking.price,
     }));
+const totalSeats = booking.trip.startDates.filter((i) =>       i.date===date)
 
     return res.status(200).json({
       success: true,
@@ -493,6 +494,7 @@ export const getTripBookingHistory = async (req, res) => {
         tripName: booking.trip.name,
         tripDestination: booking.trip.destination,
         tripDate: booking.trip.date,
+        totalSeat:totalSeats[0].seats,
       },
       selectedDate: date,
       purchaseHistory, // List of all bookings on the selected date
