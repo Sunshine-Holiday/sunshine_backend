@@ -494,7 +494,7 @@ const totalSeats = booking.trip.startDates.filter((i) =>       i.date===date)
         tripName: booking.trip.name,
         tripDestination: booking.trip.destination,
         tripDate: booking.trip.date,
-        totalSeat:totalSeats[0].seats,
+        totalSeat:totalSeats[0]?.seats||0,
       },
       selectedDate: date,
       purchaseHistory, // List of all bookings on the selected date
