@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import Review from "../model/Review.js";
 import Booking from "../model/booking.js";
 import { TryCatch } from "../middleware/error.js";
+import { generateReviewFeedbackHTML } from "../utils/userUtils.js";
+import { sendMail } from "../utils/sendOTP.js";
 
 export const createReview = async (req, res) => {
   try {
@@ -16,25 +18,17 @@ export const createReview = async (req, res) => {
     if (!booking) {
       return res.status(404).json({ error: "Booking not found" });
     }
-
+const user=req.user
     if (booking.user._id.toString() !== userId.toString()) {
       return res.status(403).json({ error: "Unauthorized" });
     }
-
-    // Parse the selected date (format: 'DD-MM-YYYY')
-    const [day, month, year] = booking.selectedDate.split("-");
+   const [day, month, year] = booking.selectedDate.split("-");
     const travelDate = new Date(`${year}-${month}-${day}`);
     const today = new Date();
 
     // Strip time
     const travelDay = new Date(travelDate.toDateString());
     const currentDay = new Date(today.toDateString());
-
-    if (travelDay > currentDay) {
-      return res
-        .status(400)
-        .json({ error: "You can only review after the trip" });
-    }
 
     const alreadyReviewed = await Review.findOne({
       user: userId,
@@ -53,7 +47,19 @@ export const createReview = async (req, res) => {
       description,
       bookingDate: booking.selectedDate,
     });
+
+    const htmlContent=generateReviewFeedbackHTML(booking,user)
     console.log(newReview);
+   await sendMail({
+      email: user.email,
+      subject: "Booking Confirmation",
+      html: htmlContent,
+    });
+    await sendMail({
+      email: "sunshineholidaypackages@gmail.com",
+      subject: "Booking Confirmation",
+      html: htmlContent,
+    });
     // Update the booking to set isReview to true
     await Booking.findByIdAndUpdate(bookingId, { isReview: true });
 

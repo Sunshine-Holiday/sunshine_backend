@@ -443,3 +443,87 @@ export const generateRefundProcessedHTML = (booking, user) => {
     </html>
   `;
 };
+
+export const generateReviewFeedbackHTML = (booking, user) => {
+return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .header {
+      background-color: #4CAF50;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .content {
+      padding: 20px;
+    }
+    .booking-details {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    .cta-button {
+      display: inline-block;
+      padding: 10px 25px;
+      background-color: #4CAF50;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+      margin-top: 15px;
+    }
+    .footer {
+      padding: 20px;
+      text-align: center;
+      color: #666;
+      font-size: 12px;
+      background-color: #f4f4f4;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>We'd Love to Hear About Your Trip!</h1>
+    </div>
+    <div class="content">
+      <h2>Hello ${user.username || 'Traveler'},</h2>
+      <p>We hope you had an amazing experience with Sunshine Holiday Packages! Your feedback means the world to us and helps us make future trips even better.</p>
+      
+      <div class="booking-details">
+        <h3>Your Trip Details</h3>
+        <p><strong>Booking ID:</strong> ${booking._id}</p>
+        <p><strong>Trip Date:</strong> ${new Date(booking.selectedDate).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      </div>
+
+      <p>Please share your experience with us. How was your trip? What did you smile about? Any suggestions for us to improve?</p>
+      <p><a href="https://www.sunshineholidaypackages.com/review/${booking._id}" class="cta-button">Write Your Review Now</a></p>
+      
+      <p>Your review will be submitted for approval and may be featured on our website to inspire other travelers!</p>
+    </div>
+    <div class="footer">
+      <p>Thank you for choosing Sunshine Holiday Packages!</p>
+      <p>If you have any questions, contact us at sunshineholidaypackages@gmail.com</p>
+      <p>© ${new Date().getFullYear()} <strong>Sunshine Holiday Packages</strong>. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`
+};
