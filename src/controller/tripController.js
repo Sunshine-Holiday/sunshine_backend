@@ -113,7 +113,6 @@ export const updateTrip = async (req, res) => {
     location,
     description,
     startDates,
-
     category,
     amenities,
     boardingPoints,
@@ -147,56 +146,32 @@ export const updateTrip = async (req, res) => {
       })()
     : [];
 
-  // Validate startDates format and content
-  if (!Array.isArray(parsedStartDates) || parsedStartDates.length === 0) {
-    return res.status(400).json({ message: "Start dates must be a non-empty array" });
-  }
-
-  for (const startDate of parsedStartDates) {
-    if (!startDate.date || startDate.seats === undefined) {
-      return res.status(400).json({ message: "Each start date must have a date and seats" });
-    }
-    if (!Number.isInteger(startDate.seats) || startDate.seats <= 0) {
-      return res.status(400).json({ message: "Seats must be a positive integer" });
+  // Validate startDates format if provided
+  if (parsedStartDates.length > 0) {
+    for (const startDate of parsedStartDates) {
+      if (startDate.seats !== undefined && (!Number.isInteger(startDate.seats) || startDate.seats <= 0)) {
+        return res.status(400).json({ message: "Seats must be a positive integer if provided" });
+      }
     }
   }
 
-  // Validate required fields
-  if (
-    !title ||
-    !price ||
-    !location 
-  ) {
-    return res.status(400).json({ message: "Missing required fields" });
-  }
-
-  // Validate boardingPoints
-  if (
-    !Array.isArray(parsedBoardingPoints) ||
-    parsedBoardingPoints.length === 0
-  ) {
-    return res.status(400).json({
-      message: "Boarding points must be an array with at least one entry",
-    });
-  }
+  // Construct update object with only provided fields
+  const updateData = {};
+  if (file?.path) updateData.banner = file.path;
+  if (title) updateData.title = title;
+  if (price) updateData.price = price;
+  if (location) updateData.location = location;
+  if (description) updateData.description = description;
+  if (parsedStartDates.length > 0) updateData.startDates = parsedStartDates;
+  if (category) updateData.category = category;
+  if (parsedAmenities.length > 0) updateData.amenities = parsedAmenities;
+  if (parsedBoardingPoints.length > 0) updateData.boardingPoints = parsedBoardingPoints;
 
   try {
     const updatedTrip = await Trip.findByIdAndUpdate(
       id,
-      {
-        banner: file?.path,
-        title,
-        price,
-        location,
-        description,
-        startDates: parsedStartDates,
-        category,
-        amenities: parsedAmenities,
-        boardingPoints: parsedBoardingPoints,
-      },
-      {
-        new: true,
-      }
+      { $set: updateData },
+      { new: true }
     );
     if (!updatedTrip)
       return res.status(404).json({ message: "Trip not found" });
@@ -205,7 +180,6 @@ export const updateTrip = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 export const deleteTrip = async (req, res) => {
   try {
     const id = req.params.id;
