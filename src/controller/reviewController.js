@@ -48,18 +48,7 @@ const user=req.user
       bookingDate: booking.selectedDate,
     });
 
-    const htmlContent=generateReviewFeedbackHTML(booking,user)
-    console.log(newReview);
-   await sendMail({
-      email: user.email,
-      subject: "Booking Confirmation",
-      html: htmlContent,
-    });
-    await sendMail({
-      email: "sunshineholidaypackages@gmail.com",
-      subject: "Booking Confirmation",
-      html: htmlContent,
-    });
+
     // Update the booking to set isReview to true
     await Booking.findByIdAndUpdate(bookingId, { isReview: true });
 
@@ -278,8 +267,8 @@ export const updateBooking = TryCatch(async (req, res) => {
     res.status(400);
     throw new Error("isReviewActivate field is required");
   }
-
-  const booking = await Booking.findById(bookingId);
+const user=req.user
+  let booking = await Booking.findById(bookingId);
 
   if (!booking) {
     res.status(404);
@@ -288,7 +277,19 @@ export const updateBooking = TryCatch(async (req, res) => {
 
   booking.isReviewActivate = isReviewActivate;
   await booking.save();
-
+  console.log(booking)
+  const htmlContent=generateReviewFeedbackHTML(booking,user)
+  
+   await sendMail({
+      email: user.email,
+      subject: "Booking Confirmation",
+      html: htmlContent,
+    });
+    await sendMail({
+      email: "sunshineholidaypackages@gmail.com",
+      subject: "Booking Confirmation",
+      html: htmlContent,
+    });
   res.status(200).json({
     booking,
     message: `Review activation ${

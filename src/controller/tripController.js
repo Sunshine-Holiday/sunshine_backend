@@ -14,7 +14,6 @@ export const createTrip = async (req, res) => {
       location,
       description,
       startDates,
-
       category,
       amenities,
       boardingPoints,
@@ -46,53 +45,27 @@ export const createTrip = async (req, res) => {
         })()
       : [];
 
-    // Validate startDates format and content
-    if (!Array.isArray(parsedStartDates) || parsedStartDates.length === 0) {
-      return res.status(400).json({ message: "Start dates must be a non-empty array" });
-    }
-
-    for (const startDate of parsedStartDates) {
-      if (!startDate.date || startDate.seats === undefined) {
-        return res.status(400).json({ message: "Each start date must have a date and seats" });
-      }
-      if (!Number.isInteger(startDate.seats) || startDate.seats <= 0) {
-        return res.status(400).json({ message: "Seats must be a positive integer" });
+    // Validate startDates format if provided
+    if (parsedStartDates.length > 0) {
+      for (const startDate of parsedStartDates) {
+        if (startDate.seats !== undefined && (!Number.isInteger(startDate.seats) || startDate.seats <= 0)) {
+          return res.status(400).json({ message: "Seats must be a positive integer if provided" });
+        }
       }
     }
 
-    // Validate required fields
-    if (
-      !title ||
-      !price ||
-      !location ||
-      !description 
-    ) {
-      return res.status(400).json({ message: "Missing required fields" });
-    }
+    // Construct trip object with only provided fields
+    const tripData = { banner: file.path };
+    if (title) tripData.title = title;
+    if (price) tripData.price = price;
+    if (location) tripData.location = location;
+    if (description) tripData.description = description;
+    if (parsedStartDates.length > 0) tripData.startDates = parsedStartDates;
+    if (category) tripData.category = category;
+    if (parsedAmenities.length > 0) tripData.amenities = parsedAmenities;
+    if (parsedBoardingPoints.length > 0) tripData.boardingPoints = parsedBoardingPoints;
 
-    // Validate boardingPoints
-    if (
-      !Array.isArray(parsedBoardingPoints) ||
-      parsedBoardingPoints.length === 0
-    ) {
-      return res.status(400).json({
-        message: "Boarding points must be an array with at least one entry",
-      });
-    }
-
-    const trip = new Trip({
-      banner: file.path,
-      title,
-      price,
-      location,
-      description,
-      startDates: parsedStartDates,
-  
-      category,
-      amenities: parsedAmenities,
-      boardingPoints: parsedBoardingPoints,
-    });
-
+    const trip = new Trip(tripData);
     const savedTrip = await trip.save();
     res.status(201).json(savedTrip);
   } catch (error) {

@@ -483,6 +483,7 @@ export const getTripBookingHistory = async (req, res) => {
       },
       totalPassengers: booking.passengers.length,
       selectedSeats: booking.selectedSeats,
+      isReviewActivate: booking.selectedSeats,
       price: booking.price,
     }));
 const totalSeats = booking.trip.startDates.filter((i) =>       i.date===date)
