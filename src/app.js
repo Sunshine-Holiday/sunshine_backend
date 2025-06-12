@@ -48,6 +48,7 @@ const corsOptions = {
       process.env.FRONTEND_URL,
       process.env.FRONTEND_URL2,
       process.env.FRONTEND_URL3,
+      "http://localhost:5173"
     ];
 
     if (!origin || allowedOrigins.includes(origin)) {
