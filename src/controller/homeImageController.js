@@ -1,6 +1,7 @@
 
 import HomeImage from "../model/homeModel.js";
 import fs from "fs";
+import mongoose from "mongoose";
 import path from "path";
 
 // Upload a new image
