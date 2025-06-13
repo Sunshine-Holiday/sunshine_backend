@@ -58,26 +58,26 @@ export const updateImageSequence = async (req, res) => {
         session.endSession();
         return res.status(400).json({ error: "Invalid image ID or sequence" });
       }
-   if (sequenceSet.has(sequence)) {
-  await session.abortTransaction();
-  session.endSession();
-  return res.status(400).json({ error: `Duplicate sequence value: ${sequence}` });
-}
+      if (sequenceSet.has(sequence)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: `Duplicate sequence value: ${sequence}` });
+      }
       sequenceSet.add(sequence);
     }
 
     // Fetch all images to validate IDs
     const imageIds = images.map(({ id }) => id);
     const existingImages = await HomeImage.find({ _id: { $in: imageIds } }).session(session);
-if (existingImages.length !== images.length) {
-  await session.abortTransaction();
-  session.endSession();
-  return res.status(404).json({ error: "One or more image IDs not found" });
-}
+    if (existingImages.length !== images.length) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: "One or more image IDs not found" });
+    }
 
     // Temporarily set sequences to negative values to avoid conflicts
     for (const image of existingImages) {
-    image.sequence = -(image.sequence + 1); // Temporary unique negative value
+      image.sequence = -(image.sequence + 1); // Temporary unique negative value
       await image.save({ session });
     }
 
@@ -92,7 +92,7 @@ if (existingImages.length !== images.length) {
 
     await session.commitTransaction();
     session.endSession();
-console.log("Image sequence updated successfully")
+
     res.status(200).json({ message: "Image sequence updated successfully" });
   } catch (error) {
     await session.abortTransaction();
