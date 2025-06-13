@@ -8,6 +8,7 @@ import { errorMiddleware } from "./middleware/error.js";
 import { fileUploadErrorHandler } from "./middleware/multer.js";
 
 // Importing Routes
+import homeRouter from "./router/homeImageRoutes.js";
 import userRouter from "./router/userRoute.js";
 import blogRouter from "./router/blogRouter.js";
 import createRouter from "./router/Terms.js";
@@ -70,6 +71,7 @@ app.use("/uploads", express.static("uploads"));
 
 // Routes
 app.get("/", (req, res) => res.send("<h1>Server is working</h1>"));
+app.use("/api/v1/home", homeRouter);
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/trips", tripRoutes);
 app.use("/api/v1/blog", blogRouter);
