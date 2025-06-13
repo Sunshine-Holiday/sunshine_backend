@@ -92,7 +92,7 @@ if (existingImages.length !== images.length) {
 
     await session.commitTransaction();
     session.endSession();
-
+console.log("Image sequence updated successfully")
     res.status(200).json({ message: "Image sequence updated successfully" });
   } catch (error) {
     await session.abortTransaction();
