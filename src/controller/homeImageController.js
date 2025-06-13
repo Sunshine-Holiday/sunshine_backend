@@ -37,31 +37,65 @@ export const uploadHomeImage = async (req, res) => {
 
 // Update image sequence
 export const updateImageSequence = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { images } = req.body; // Array of { id, sequence }
 
     if (!Array.isArray(images) || images.length === 0) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ error: "Invalid sequence data" });
     }
 
-    // Validate and update sequence for each image
+    // Validate input and check for duplicate sequences
+    const sequenceSet = new Set();
     for (const { id, sequence } of images) {
       if (!id || typeof sequence !== "number") {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({ error: "Invalid image ID or sequence" });
       }
-
-      const image = await HomeImage.findById(id);
-      if (!image) {
-        return res.status(404).json({ error: `Image with ID ${id} not found` });
+      if (sequenceSet.has(sequence)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: `Duplicate sequence value: ${sequence}` });
       }
-
-      // Update sequence
-      image.sequence = sequence;
-      await image.save();
+      sequenceSet.add(sequence);
     }
+
+    // Fetch all images to validate IDs
+    const imageIds = images.map(({ id }) => id);
+    const existingImages = await HomeImage.find({ _id: { $in: imageIds } }).session(session);
+    if (existingImages.length !== images.length) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: "One or more image IDs not found" });
+    }
+
+    // Temporarily set sequences to negative values to avoid conflicts
+    for (const image of existingImages) {
+      image.sequence = -(image.sequence + 1); // Temporary unique negative value
+      await image.save({ session });
+    }
+
+    // Update sequences to desired values
+    for (const { id, sequence } of images) {
+      await HomeImage.findByIdAndUpdate(
+        id,
+        { sequence },
+        { session, runValidators: true }
+      );
+    }
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(200).json({ message: "Image sequence updated successfully" });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("Error updating sequence:", error);
     res.status(500).json({ error: "Server error during sequence update" });
   }
