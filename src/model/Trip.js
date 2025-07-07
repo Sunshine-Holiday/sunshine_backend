@@ -1,20 +1,18 @@
-// models/Trip.js
 import mongoose from "mongoose";
 
 const boardingPointSchema = new mongoose.Schema({
-  location: { type: String }, // Removed required: false (not needed, as fields are optional by default)
+  location: { type: String },
   time: { type: String },
   details: { type: String },
   maplink: { type: String },
 });
 
 const startDateSchema = new mongoose.Schema({
-  date: { type: String }, // Removed required: true to allow optional date
+  date: { type: String },
   seats: {
-    type: Number, // Keep as Number for consistency
+    type: Number,
     validate: {
       validator: function (value) {
-        // Allow null/undefined or positive integers
         return value == null || (Number.isInteger(value) && value > 0);
       },
       message: "Seats must be a positive integer if provided",
@@ -22,16 +20,32 @@ const startDateSchema = new mongoose.Schema({
   },
 });
 
+const packageSchema = new mongoose.Schema({
+  title: { type: String, required: true }, // e.g., "Family Package"
+  description: { type: String },
+  personCount: { type: Number, required: true }, // Number of people (e.g., 4 for Family)
+  price: { type: Number, required: true }, // Package-specific price
+});
+
+const roomChoiceSchema = new mongoose.Schema({
+  description: { type: String, required: true }, // e.g., "1 room 4 people"
+  personCount: { type: Number, required: true }, // Number of people this choice accommodates
+  roomCount: { type: Number, required: true }, // Number of rooms
+  price: { type: Number, required: true }, // Price for this room configuration
+});
+
 const tripSchema = new mongoose.Schema({
-  banner: { type: String }, // Removed required: true
-  title: { type: String }, // Removed required: true
-  price: { type: String }, // Removed required: true
-  location: { type: String }, // Removed required: true
-  description: { type: String }, // Removed required: true
-  startDates: [startDateSchema], // Keep as array, no changes needed
-  category: { type: String }, // Removed required: true
-  amenities: { type: [String], default: [] }, // Added default to handle empty arrays
-  boardingPoints: [boardingPointSchema], // Keep as array, no changes needed
+  banner: { type: String },
+  title: { type: String },
+  location: { type: String },
+  description: { type: String },
+  startDates: [startDateSchema],
+   price: { type: String }, // single price for the trip
+  category: { type: String },
+  amenities: { type: [String], default: [] },
+  boardingPoints: [boardingPointSchema],
+  packages: [packageSchema], // Multiple package options (Family, Friends, Couple/Solo) offer optional
+  roomChoices: [roomChoiceSchema], // Room booking options based on person count optional
 });
 
 export default mongoose.model("Trip", tripSchema);

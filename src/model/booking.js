@@ -1,12 +1,12 @@
 import mongoose from "mongoose";
 
 const passengerSchema = new mongoose.Schema({
-  name: { type: String, required: false },
-  age: { type: String, required: false },
-  gender: { type: String, required: false },
-  idProof: { type: String, required: false },
-  idProofNumber: { type: String, required: false },
-  address: { type: String, required: false },
+  name: { type: String, required: true },
+  age: { type: String, required: true },
+  gender: { type: String, required: true },
+  idProof: { type: String, required: true },
+  idProofNumber: { type: String, required: true },
+  address: { type: String, required: true },
 });
 
 const bookingSchema = new mongoose.Schema(
@@ -21,7 +21,22 @@ const bookingSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    price: { type: String, required: true },
+    selectedPackage: {
+      type: mongoose.Schema.Types.ObjectId, // Reference to package _id
+      required: true,
+    },
+    selectedRoomChoice: {
+      type: mongoose.Schema.Types.ObjectId, // Reference to room choice _id
+      required: true,
+    },
+    price: { type: Number, required: true }, // Total price based on package and room choice
+    advancePaid: { type: Number, default: 0 }, // Amount paid upfront (50% of total)
+    remainingBalance: { type: Number, default: 0 }, // Remaining amount to be paid offline
+    paymentStatus: {
+      type: String,
+      enum: ["advance", "full", "pending"],
+      default: "pending",
+    },
     passengers: [passengerSchema],
     selectedDate: { type: String, required: true },
     selectedSeats: { type: [String], required: true },
@@ -29,8 +44,8 @@ const bookingSchema = new mongoose.Schema(
     isReviewActivate: { type: Boolean, default: false },
     status: {
       type: String,
-      enum: ["confirmed", "processing", "refund", "resolved"], // Allowed values
-      default: "confirmed", // Default value
+      enum: ["confirmed", "processing", "refund", "resolved"],
+      default: "confirmed",
     },
   },
   { timestamps: true }

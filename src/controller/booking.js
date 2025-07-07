@@ -40,12 +40,30 @@ const checkRequiredFields = (fields, res) => {
 // Create a new booking
 export const createBooking = async (req, res) => {
   try {
-    const { tripId, price, selectedDate, passengers, selectedSeats } = req.body;
+    const {
+      tripId,
+      selectedPackage,
+      selectedRoomChoice,
+      price,
+      selectedDate,
+      passengers,
+      selectedSeats,
+      advancePaid = 0,
+    } = req.body;
     const userId = req.user._id;
-    // Check for required fields
-    // console.log(req.body)
+
+    // Check for required fields based on the schema
     const missingFieldsError = checkRequiredFields(
-      { tripId, userId, price, selectedDate, selectedSeats },
+      {
+        tripId,
+        userId,
+        selectedPackage,
+        selectedRoomChoice,
+        price,
+        selectedDate,
+        passengers,
+        selectedSeats,
+      },
       res
     );
     if (missingFieldsError) return missingFieldsError;
@@ -55,16 +73,34 @@ export const createBooking = async (req, res) => {
     if (!trip) return; // Exit if trip is not found
 
     const user = req.user;
-    console.log(user);
+
+    // Calculate remaining balance
+    const remainingBalance = price - advancePaid;
+
+    // Determine payment status
+    let paymentStatus = "pending";
+    if (advancePaid > 0 && advancePaid < price) {
+      paymentStatus = "advance";
+    } else if (advancePaid >= price) {
+      paymentStatus = "full";
+    }
 
     // Create the booking
     const newBooking = new Booking({
       trip: tripId,
       user: userId,
+      selectedPackage,
+      selectedRoomChoice,
       price,
-      passengers: passengers,
+      advancePaid,
+      remainingBalance,
+      paymentStatus,
+      passengers,
       selectedDate,
       selectedSeats,
+      isReview: false,
+      isReviewActivate: false,
+      status: "confirmed",
     });
 
     // Save the booking
@@ -82,6 +118,7 @@ export const createBooking = async (req, res) => {
       subject: "Booking Confirmation",
       html: htmlContent,
     });
+
     return res.status(201).json(newBooking);
   } catch (error) {
     console.error(error);
