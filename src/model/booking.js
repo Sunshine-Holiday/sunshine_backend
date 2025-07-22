@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 const passengerSchema = new mongoose.Schema({
+  phoneNumber:{ type: String, required: true },
   name: { type: String, required: true },
   age: { type: String, required: true },
   gender: { type: String, required: true },

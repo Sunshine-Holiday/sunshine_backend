@@ -41,6 +41,7 @@ const checkRequiredFields = (fields, res) => {
 export const createBooking = async (req, res) => {
   try {
     const {
+      phoneNumber,
       tripId,
       selectedPackage,
       selectedRoomChoice,
@@ -48,6 +49,7 @@ export const createBooking = async (req, res) => {
       selectedDate,
       passengers,
       selectedSeats,
+      address,
       advancePaid = 0,
     } = req.body;
     const userId = req.user._id;
@@ -87,6 +89,8 @@ export const createBooking = async (req, res) => {
 
     // Create the booking
     const newBooking = new Booking({
+      address:address,
+      phoneNumber:phoneNumber,
       trip: tripId,
       user: userId,
       selectedPackage,
@@ -513,6 +517,7 @@ export const getTripBookingHistory = async (req, res) => {
     // Construct purchase history details
     const purchaseHistory = tripBookings.map((booking) => ({
       bookingId: booking._id,
+
       user: {
         id: booking?.user?._id || "",
         name: booking?.user?.name || "",
@@ -522,6 +527,8 @@ export const getTripBookingHistory = async (req, res) => {
       selectedSeats: booking.selectedSeats,
       isReviewActivate: booking.selectedSeats,
       price: booking.price,
+      remainingBalance:booking.remainingBalance,
+      advancePaid:booking.advancePaid
     }));
 const totalSeats = booking.trip.startDates.filter((i) =>       i.date===date)
 
