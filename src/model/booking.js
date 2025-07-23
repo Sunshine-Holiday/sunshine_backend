@@ -7,7 +7,7 @@ const passengerSchema = new mongoose.Schema({
   gender: { type: String, required: true },
   idProof: { type: String, required: true },
   idProofNumber: { type: String, required: true },
-  address: { type: String, required: true },
+  address: { type: String },
 });
 
 const bookingSchema = new mongoose.Schema(
@@ -24,11 +24,11 @@ const bookingSchema = new mongoose.Schema(
     },
     selectedPackage: {
       type: mongoose.Schema.Types.ObjectId, // Reference to package _id
-      required: true,
+      // required: true,
     },
     selectedRoomChoice: {
       type: mongoose.Schema.Types.ObjectId, // Reference to room choice _id
-      required: true,
+      // required: true,
     },
     price: { type: Number, required: true }, // Total price based on package and room choice
     advancePaid: { type: Number, default: 0 }, // Amount paid upfront (50% of total)

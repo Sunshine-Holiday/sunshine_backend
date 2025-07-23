@@ -18,10 +18,10 @@ export const createReview = async (req, res) => {
     if (!booking) {
       return res.status(404).json({ error: "Booking not found" });
     }
-const user=req.user
-    if (booking.user._id.toString() !== userId.toString()) {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
+// const user=req.user
+//     if (booking.user._id.toString() !== userId.toString()) {
+//       return res.status(403).json({ error: "Unauthorized" });
+//     }
    const [day, month, year] = booking.selectedDate.split("-");
     const travelDate = new Date(`${year}-${month}-${day}`);
     const today = new Date();
