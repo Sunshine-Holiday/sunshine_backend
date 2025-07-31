@@ -19,6 +19,8 @@ export const createTrip = async (req, res) => {
       boardingPoints,
       packages,
       roomChoices,
+         advancePaymentPercentage,
+    discountPercentage
     } = req.body;
 
     // Parse arrays from form data
@@ -146,7 +148,13 @@ export const createTrip = async (req, res) => {
     if (parsedBoardingPoints.length > 0) tripData.boardingPoints = parsedBoardingPoints;
     if (parsedPackages.length > 0) tripData.packages = parsedPackages;
     if (parsedRoomChoices.length > 0) tripData.roomChoices = parsedRoomChoices;
-
+ 
+    if (typeof advancePaymentPercentage !== "undefined") {
+      tripData.advancePaymentPercentage = advancePaymentPercentage;
+    }
+    if (typeof discountPercentage !== "undefined") {
+      tripData.discountPercentage = discountPercentage;
+    }
     const trip = new Trip(tripData);
     const savedTrip = await trip.save();
     res.status(201).json(savedTrip);
@@ -199,6 +207,8 @@ export const updateTrip = async (req, res) => {
     boardingPoints,
     packages,
     roomChoices,
+    advancePaymentPercentage,
+    discountPercentage
   } = req.body;
 
   const file = req.file;
@@ -328,7 +338,12 @@ export const updateTrip = async (req, res) => {
   if (parsedBoardingPoints.length > 0) updateData.boardingPoints = parsedBoardingPoints;
   if (parsedPackages.length > 0) updateData.packages = parsedPackages;
   if (parsedRoomChoices.length > 0) updateData.roomChoices = parsedRoomChoices;
-
+if (typeof advancePaymentPercentage !== "undefined") {
+  updateData.advancePaymentPercentage = advancePaymentPercentage;
+}
+if (typeof discountPercentage !== "undefined") {
+  updateData.discountPercentage = discountPercentage;
+}
   try {
     const updatedTrip = await Trip.findByIdAndUpdate(
       id,

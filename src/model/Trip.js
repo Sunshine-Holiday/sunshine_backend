@@ -40,12 +40,14 @@ const tripSchema = new mongoose.Schema({
   location: { type: String },
   description: { type: String },
   startDates: [startDateSchema],
-   price: { type: String }, // single price for the trip
+  price: { type: String }, // single price for the trip
   category: { type: String },
   amenities: { type: [String], default: [] },
   boardingPoints: [boardingPointSchema],
   packages: [packageSchema], // Multiple package options (Family, Friends, Couple/Solo) offer optional
   roomChoices: [roomChoiceSchema], // Room booking options based on person count optional
+  advancePaymentPercentage: { type: Number, required: false }, // Percentage of advance payment
+  discountPercentage: { type: Number, required: false }, // Percentage of discount
 });
 
 export default mongoose.model("Trip", tripSchema);
