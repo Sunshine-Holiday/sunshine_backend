@@ -3,6 +3,8 @@ export const errorMiddleware = (err, req, res, next) => {
     return next(err); // Delegate to the default Express error handler
   }
 
+  console.log("Error caught by middleware:", err); // Log the full error
+
   err.message ||= "Internal Server Error";
   err.statusCode ||= 500;
 
@@ -13,6 +15,7 @@ export const errorMiddleware = (err, req, res, next) => {
     message: err.message,
   });
 };
+
 export const TryCatch = (func) => (req, res, next) => {
   return Promise.resolve(func(req, res, next)).catch(next);
 };
