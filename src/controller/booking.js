@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Booking from "../model/booking.js";
 import Trip from "../model/Trip.js";
 import User from "../model/userModel.js";
@@ -38,43 +39,108 @@ const checkRequiredFields = (fields, res) => {
 };
 
 // Create a new booking
+
+
 export const createBooking = async (req, res) => {
   try {
     const {
-      phoneNumber,
       tripId,
       selectedPackage,
       selectedRoomChoice,
+      roomCount = 0,
       price,
+      advancePaid = 0,
       selectedDate,
       passengers,
       selectedSeats,
-      address,
-      advancePaid = 0,
     } = req.body;
     const userId = req.user._id;
 
     // Check for required fields based on the schema
-    const missingFieldsError = checkRequiredFields(
-      {
-        tripId,
-        userId,
-        selectedPackage,
-        selectedRoomChoice,
-        price,
-        selectedDate,
-        passengers,
-        selectedSeats,
-      },
-      res
-    );
+    const requiredFields = {
+      tripId,
+      userId,
+      price,
+      selectedDate,
+      passengers,
+      selectedSeats,
+    };
+    const missingFieldsError = checkRequiredFields(requiredFields, res);
     if (missingFieldsError) return missingFieldsError;
 
-    // Validate trip and user
+    // Validate trip
     const trip = await validateTrip(tripId, res);
-    if (!trip) return; // Exit if trip is not found
+    if (!trip) return;
 
+    // Validate user
     const user = req.user;
+    if (!user) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    // Validate roomCount if selectedRoomChoice is provided
+    if (selectedRoomChoice) {
+      if (!roomCount || roomCount < Math.ceil(passengers.length / 2)) {
+        return res.status(400).json({
+          message: `Room count must be at least ${Math.ceil(passengers.length / 2)} for ${passengers.length} passengers`,
+        });
+      }
+    } else if (roomCount > 0) {
+      return res.status(400).json({
+        message: "Room count provided without a selected room choice",
+      });
+    }
+
+    // Validate selectedPackage and selectedRoomChoice
+    if (selectedPackage && !mongoose.Types.ObjectId.isValid(selectedPackage)) {
+      return res.status(400).json({ message: "Invalid package ID" });
+    }
+    if (selectedRoomChoice && !mongoose.Types.ObjectId.isValid(selectedRoomChoice)) {
+      return res.status(400).json({ message: "Invalid room choice ID" });
+    }
+
+    // Validate passengers
+    if (!Array.isArray(passengers) || passengers.length === 0) {
+      return res.status(400).json({ message: "At least one passenger is required" });
+    }
+    const passengerValidation = passengers.every(
+      (p) =>
+        p.name &&
+        p.age &&
+        p.gender &&
+        ["male", "female", "other"].includes(p.gender) &&
+        p.idProof &&
+        ["aadhar", "pan"].includes(p.idProof) &&
+        p.idProofNumber &&
+        p.phoneNumber
+    );
+    if (!passengerValidation) {
+      return res.status(400).json({ message: "Invalid passenger details" });
+    }
+
+    // Validate selectedSeats
+    if (!Array.isArray(selectedSeats) || selectedSeats.length === 0) {
+      return res.status(400).json({ message: "At least one seat selection is required" });
+    }
+    const validSeats = selectedSeats.every(
+      (seat) => seat === "N/A" || /^\d+$/.test(seat) || seat === "block"
+    );
+    if (!validSeats) {
+      return res.status(400).json({ message: "Invalid seat format" });
+    }
+
+    // Validate selectedDate format
+    if (!/^\d{2}-\d{2}-\d{4}$/.test(selectedDate)) {
+      return res.status(400).json({ message: "Selected date must be in DD-MM-YYYY format" });
+    }
+
+    // Validate price and advancePaid
+    if (price < 0) {
+      return res.status(400).json({ message: "Price cannot be negative" });
+    }
+    if (advancePaid < 0) {
+      return res.status(400).json({ message: "Advance paid cannot be negative" });
+    }
 
     // Calculate remaining balance
     const remainingBalance = price - advancePaid;
@@ -89,12 +155,11 @@ export const createBooking = async (req, res) => {
 
     // Create the booking
     const newBooking = new Booking({
-      address:address,
-      phoneNumber:phoneNumber,
       trip: tripId,
       user: userId,
-      selectedPackage,
-      selectedRoomChoice,
+      selectedPackage: selectedPackage || null,
+      selectedRoomChoice: selectedRoomChoice || null,
+      roomCount,
       price,
       advancePaid,
       remainingBalance,
@@ -110,22 +175,24 @@ export const createBooking = async (req, res) => {
     // Save the booking
     await newBooking.save();
 
-    console.log("Booking created successfully", user.email);
+    // Send confirmation emails
     const htmlContent = generateBookingConfirmationHTML(newBooking, user);
-    await sendMail({
-      email: user.email,
-      subject: "Booking Confirmation",
-      html: htmlContent,
-    });
-    await sendMail({
-      email: "sunshineholidaypackages@gmail.com",
-      subject: "Booking Confirmation",
-      html: htmlContent,
-    });
+    await Promise.all([
+      sendMail({
+        email: user.email,
+        subject: "Booking Confirmation",
+        html: htmlContent,
+      }),
+      sendMail({
+        email: "sunshineholidaypackages@gmail.com",
+        subject: "Booking Confirmation",
+        html: htmlContent,
+      }),
+    ]);
 
     return res.status(201).json(newBooking);
   } catch (error) {
-    console.error(error);
+    console.error("Error creating booking:", error);
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };
@@ -273,12 +340,13 @@ export const getAllBookings = async (req, res) => {
   }
 };
 
+
 export const getAllBookingsByUserId = async (req, res) => {
   const { _id } = req.user; // Extract the user ID from the request
-  console.log("id is required", req.user);
+  console.log("User ID:", _id);
 
   if (!_id) {
-    return res.status(401).json({ message: "id is required to get access" });
+    return res.status(401).json({ message: "User ID is required to get access" });
   }
 
   try {
@@ -286,22 +354,80 @@ export const getAllBookingsByUserId = async (req, res) => {
     const bookings = await Booking.find({ user: _id })
       .populate({
         path: "trip",
-        // Only populate if trip exists
-        match: { _id: { $exists: true } },
+        populate: [
+          {
+            path: "packages",
+            select: "title description personCount price",
+          },
+          {
+            path: "roomChoices",
+            select: "description personCount roomCount price",
+          },
+        ],
       })
-      .populate("user")
+      .populate({
+        path: "user",
+        select: "username email phone",
+      })
       .sort({ createdAt: -1 })
       .exec();
 
-    // Filter out bookings where trip is null/undefined (i.e., trip doesn't exist)
-    const validBookings = bookings.filter((booking) => booking.trip !== null);
+    // Filter out bookings where trip is null and map selectedPackage/selectedRoomChoice
+    const validBookings = bookings
+      .filter((booking) => booking.trip !== null)
+      .map((booking) => {
+        // Transform selectedDate to DD-MM-YYYY string
+        const selectedDate = booking.selectedDate
+          ? new Date(booking.selectedDate).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }).split("/").join("-")
+          : "N/A";
 
-    if (!validBookings || validBookings.length === 0) {
-      return res.status(200).json({ success: true, bookings: [] });
-    }
+        // Find the selectedPackage from trip.packages
+        const selectedPackage = booking.selectedPackage
+          ? booking.trip.packages.find((pkg) =>
+              pkg._id.equals(booking.selectedPackage)
+            )
+          : null;
+
+        // Find the selectedRoomChoice from trip.roomChoices
+        const selectedRoomChoice = booking.selectedRoomChoice
+          ? booking.trip.roomChoices.find((room) =>
+              room._id.equals(booking.selectedRoomChoice)
+            )
+          : null;
+
+        return {
+          ...booking.toObject(),
+          selectedDate,
+          selectedPackage: selectedPackage
+            ? {
+                _id: selectedPackage._id,
+                title: selectedPackage.title,
+                description: selectedPackage.description,
+                personCount: selectedPackage.personCount,
+                price: selectedPackage.price,
+              }
+            : null,
+          selectedRoomChoice: selectedRoomChoice
+            ? {
+                _id: selectedRoomChoice._id,
+                description: selectedRoomChoice.description,
+                personCount: selectedRoomChoice.personCount,
+                roomCount: selectedRoomChoice.roomCount,
+                price: selectedRoomChoice.price,
+              }
+            : null,
+        };
+      });
 
     // Return the list of valid bookings
-    res.status(200).json({ success: true, bookings: validBookings });
+    res.status(200).json({
+      success: true,
+      bookings: validBookings.length > 0 ? validBookings : [],
+    });
   } catch (error) {
     console.error("Error fetching bookings:", error);
     res.status(500).json({
@@ -311,6 +437,7 @@ export const getAllBookingsByUserId = async (req, res) => {
     });
   }
 };
+
 // export const getTripBookingStats = async (req, res) => {
 //   try {
 //     const { tripId } = req.params;
@@ -416,6 +543,7 @@ export const getTripBookingStats = async (req, res) => {
 
     // Group bookings by date with +1 day
     const dailyStats = bookings.reduce((acc, booking) => {
+      console.log(booking.selectedDate);
       const [day, month, year] = booking.selectedDate.split("-");
       const dateObj = new Date(year, month - 1, day);
       dateObj.setDate(dateObj.getDate());
