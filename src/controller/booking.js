@@ -100,9 +100,9 @@ export const createBooking = async (req, res) => {
     }
 
     // Validate passengers
-    if (!Array.isArray(passengers) || passengers.length === 0) {
-      return res.status(400).json({ message: "At least one passenger is required" });
-    }
+    // if (!Array.isArray(passengers) || passengers.length === 0) {
+    //   return res.status(400).json({ message: "At least one passenger is required" });
+    // }
     const passengerValidation = passengers.every(
       (p) =>
         p.name &&

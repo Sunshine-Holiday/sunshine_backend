@@ -124,9 +124,9 @@ export const createTrip = async (req, res) => {
     // Validate roomChoices (optional, but validate if provided)
     for (const room of parsedRoomChoices) {
       if (room.description) {
-        if (!room.personCount || !Number.isInteger(room.personCount) || room.personCount <= 0) {
-          return res.status(400).json({ message: "Room choice person count must be a positive integer" });
-        }
+        // if (!room.personCount || !Number.isInteger(room.personCount) || room.personCount <= 0) {
+        //   return res.status(400).json({ message: "Room choice person count must be a positive integer" });
+        // }
         if (!room.roomCount || !Number.isInteger(room.roomCount) || room.roomCount <= 0) {
           return res.status(400).json({ message: "Room choice room count must be a positive integer" });
         }
@@ -313,9 +313,9 @@ export const updateTrip = async (req, res) => {
   // Validate roomChoices (optional, but validate if provided)
   for (const room of parsedRoomChoices) {
     if (room.description) {
-      if (!room.personCount || !Number.isInteger(room.personCount) || room.personCount <= 0) {
-        return res.status(400).json({ message: "Room choice person count must be a positive integer" });
-      }
+      // if (!room.personCount || !Number.isInteger(room.personCount) || room.personCount <= 0) {
+      //   return res.status(400).json({ message: "Room choice person count must be a positive integer" });
+      // }
       if (!room.roomCount || !Number.isInteger(room.roomCount) || room.roomCount <= 0) {
         return res.status(400).json({ message: "Room choice room count must be a positive integer" });
       }

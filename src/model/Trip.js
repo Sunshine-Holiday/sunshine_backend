@@ -29,7 +29,7 @@ const packageSchema = new mongoose.Schema({
 
 const roomChoiceSchema = new mongoose.Schema({
   description: { type: String, required: true }, // e.g., "1 room 4 people"
-  personCount: { type: Number, required: true }, // Number of people this choice accommodates
+
   roomCount: { type: Number, required: true }, // Number of rooms
   price: { type: Number, required: true }, // Price for this room configuration
 });
