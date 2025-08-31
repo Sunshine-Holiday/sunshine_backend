@@ -48,6 +48,7 @@ const tripSchema = new mongoose.Schema({
   roomChoices: [roomChoiceSchema], // Room booking options based on person count optional
   advancePaymentPercentage: { type: Number, required: false }, // Percentage of advance payment
   discountPercentage: { type: Number, required: false }, // Percentage of discount
+  readonly: { type: Boolean, default: false }, // Readonly flag
 });
 
 export default mongoose.model("Trip", tripSchema);

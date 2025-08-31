@@ -9,6 +9,7 @@ export const createTrip = async (req, res) => {
     }
 
     const {
+      readonly,
       title,
       price,
       location,
@@ -88,7 +89,7 @@ export const createTrip = async (req, res) => {
     if (!category) {
       return res.status(400).json({ message: "Category is required" });
     }
-    if (parsedStartDates.length === 0) {
+    if (!readonly &&parsedStartDates.length === 0) {
       return res.status(400).json({ message: "At least one start date is required" });
     }
     if (parsedBoardingPoints.length === 0) {
@@ -97,7 +98,7 @@ export const createTrip = async (req, res) => {
 
     // Validate price and packages
     const parsedPrice = price ? parseFloat(price) : 0;
-    if (parsedPackages.length === 0 && (!parsedPrice || parsedPrice <= 0)) {
+    if (!readonly && parsedPackages.length === 0 && (!parsedPrice || parsedPrice <= 0)) {
       return res.status(400).json({ message: "Price is required when no packages are provided" });
     }
 
@@ -138,6 +139,9 @@ export const createTrip = async (req, res) => {
 
     // Construct trip object with provided fields
     const tripData = { banner: file.path };
+    if (readonly) {
+      tripData.readonly = readonly;
+    }
     if (title) tripData.title = title;
     if (parsedPrice > 0) tripData.price = parsedPrice;
     if (location) tripData.location = location;
@@ -208,7 +212,8 @@ export const updateTrip = async (req, res) => {
     packages,
     roomChoices,
     advancePaymentPercentage,
-    discountPercentage
+    discountPercentage,
+    readonly
   } = req.body;
 
   const file = req.file;
@@ -278,22 +283,20 @@ export const updateTrip = async (req, res) => {
   if (category && !category) {
     return res.status(400).json({ message: "Category is required" });
   }
-  if (parsedStartDates.length > 0) {
+  if (!readonly&&parsedStartDates.length > 0) {
     for (const startDate of parsedStartDates) {
       if (startDate.seats !== undefined && startDate.seats !== "block" && (!Number.isInteger(startDate.seats) || startDate.seats <= 0)) {
         return res.status(400).json({ message: "Seats must be a positive integer if provided" });
       }
     }
-  } else {
-    return res.status(400).json({ message: "At least one start date is required" });
-  }
+  } 
   if (parsedBoardingPoints.length === 0) {
     return res.status(400).json({ message: "At least one boarding point is required" });
   }
 
   // Validate price and packages
   const parsedPrice = price ? parseFloat(price) : 0;
-  if (parsedPackages.length === 0 && (!parsedPrice || parsedPrice <= 0)) {
+  if (!readonly && parsedPackages.length === 0 && (!parsedPrice || parsedPrice <= 0)) {
     return res.status(400).json({ message: "Price is required when no packages are provided" });
   }
 
