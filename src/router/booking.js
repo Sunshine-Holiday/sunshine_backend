@@ -38,7 +38,7 @@ router.get(
   getTripBookingStatsOfTrip
 );
 // Create a new booking
-router.post("/", isAuthenticated, createBooking);
+router.post("/", createBooking);
 router.post("/request", isAuthenticated, requestRefund);
 router.put("/update/:bookingId", isAuthenticated, updateBookingSeats);
 router.delete("/delete/:bookingId", isAuthenticated, deleteBookingSeats);

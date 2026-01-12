@@ -33,13 +33,12 @@ const checkRequiredFields = (fields, res) => {
 
   //   console.log({ tripId, userId, price, passengers, selectedDate, selectedSeats })
 
-  if (!tripId || !userId || !price || !selectedDate || !selectedSeats) {
+  if (!tripId  || !price || !selectedDate || !selectedSeats) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 };
 
 // Create a new booking
-
 
 export const createBooking = async (req, res) => {
   try {
@@ -54,98 +53,153 @@ export const createBooking = async (req, res) => {
       passengers,
       selectedSeats,
     } = req.body;
-    const userId = req.user._id;
 
-    // Check for required fields based on the schema
-    const requiredFields = {
-      tripId,
-      userId,
-      price,
-      selectedDate,
-      passengers,
-      selectedSeats,
-    };
-    const missingFieldsError = checkRequiredFields(requiredFields, res);
-    if (missingFieldsError) return missingFieldsError;
-
-    // Validate trip
-    const trip = await validateTrip(tripId, res);
-    if (!trip) return;
-
-    // Validate user
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ message: "User not authenticated" });
+    // ---------------------------
+    // 🔴 REQUIRED FIELD CHECK
+    // ---------------------------
+    if (
+      !tripId ||
+      !price ||
+      !selectedDate ||
+      !Array.isArray(passengers) ||
+      !Array.isArray(selectedSeats)
+    ) {
+      return res.status(400).json({
+        message: "Missing required booking fields",
+      });
     }
 
-    // Validate roomCount if selectedRoomChoice is provided
+    // ---------------------------
+    // 🧭 VALIDATE TRIP
+    // ---------------------------
+    if (!mongoose.Types.ObjectId.isValid(tripId)) {
+      return res.status(400).json({ message: "Invalid trip ID" });
+    }
+
+    const trip = await Trip.findById(tripId);
+    if (!trip) {
+      return res.status(404).json({ message: "Trip not found" });
+    }
+
+    // ---------------------------
+    // 📦 PACKAGE / ROOM VALIDATION
+    // ---------------------------
+    if (
+      selectedPackage &&
+      !mongoose.Types.ObjectId.isValid(selectedPackage)
+    ) {
+      return res.status(400).json({ message: "Invalid package ID" });
+    }
+
+    if (
+      selectedRoomChoice &&
+      !mongoose.Types.ObjectId.isValid(selectedRoomChoice)
+    ) {
+      return res.status(400).json({ message: "Invalid room choice ID" });
+    }
+
     if (selectedRoomChoice) {
-      if (!roomCount || roomCount < Math.ceil(passengers.length / 2)) {
+      const minRooms = Math.ceil(passengers.length / 2);
+      if (!roomCount || roomCount < minRooms) {
         return res.status(400).json({
-          message: `Room count must be at least ${Math.ceil(passengers.length / 2)} for ${passengers.length} passengers`,
+          message: `Room count must be at least ${minRooms}`,
         });
       }
     } else if (roomCount > 0) {
       return res.status(400).json({
-        message: "Room count provided without a selected room choice",
+        message: "Room count provided without selecting a room",
       });
     }
 
-    // Validate selectedPackage and selectedRoomChoice
-    if (selectedPackage && !mongoose.Types.ObjectId.isValid(selectedPackage)) {
-      return res.status(400).json({ message: "Invalid package ID" });
-    }
-    if (selectedRoomChoice && !mongoose.Types.ObjectId.isValid(selectedRoomChoice)) {
-      return res.status(400).json({ message: "Invalid room choice ID" });
-    }
-
-    // Validate passengers
-    // if (!Array.isArray(passengers) || passengers.length === 0) {
-    //   return res.status(400).json({ message: "At least one passenger is required" });
-    // }
-    const passengerValidation = passengers.every(
-      (p) =>
-        p.name &&
-        p.age &&
-        p.gender &&
-        ["male", "female", "other"].includes(p.gender) &&
-        p.idProof &&
-        ["aadhar", "pan"].includes(p.idProof) &&
-        p.idProofNumber &&
-        p.phoneNumber
+    // ---------------------------
+    // 👤 PASSENGER VALIDATION
+    // ---------------------------
+    const validPassengers = passengers.every((p) =>
+      p.name &&
+      p.age &&
+      ["male", "female", "other"].includes(p.gender) &&
+      ["aadhar", "pan"].includes(p.idProof) &&
+      p.idProofNumber &&
+      p.phoneNumber
     );
-    if (!passengerValidation) {
-      return res.status(400).json({ message: "Invalid passenger details" });
+
+    if (!validPassengers) {
+      return res.status(400).json({
+        message: "Invalid passenger details",
+      });
     }
 
-    // Validate selectedSeats
-    if (!Array.isArray(selectedSeats) || selectedSeats.length === 0) {
-      return res.status(400).json({ message: "At least one seat selection is required" });
+    // ---------------------------
+    // 🪑 SEAT VALIDATION (MULTI BUS)
+    // ---------------------------
+    if (selectedSeats.length === 0) {
+      return res.status(400).json({
+        message: "At least one seat is required",
+      });
     }
-    const validSeats = selectedSeats.every(
-      (seat) => seat === "N/A" || /^\d+$/.test(seat) || seat === "block"
+
+    const seatsAreValid = selectedSeats.every(
+      (s) =>
+        typeof s === "object" &&
+        typeof s.seat === "string" &&
+        typeof s.busIndex === "number" &&
+        s.busIndex >= 0
     );
-    if (!validSeats) {
-      return res.status(400).json({ message: "Invalid seat format" });
+
+    if (!seatsAreValid) {
+      return res.status(400).json({
+        message: "Each seat must contain seat and busIndex",
+      });
     }
 
-    // Validate selectedDate format
+    // ---------------------------
+    // 🔒 OPTIONAL: PREVENT DOUBLE BOOKING
+    // ---------------------------
+    const seatConflicts = await Booking.findOne({
+      trip: tripId,
+      selectedDate,
+      selectedSeats: {
+        $elemMatch: {
+          $or: selectedSeats.map((s) => ({
+            seat: s.seat,
+            busIndex: s.busIndex,
+          })),
+        },
+      },
+    });
+
+    if (seatConflicts) {
+      return res.status(400).json({
+        message: "One or more selected seats are already booked",
+      });
+    }
+
+    // ---------------------------
+    // 📅 DATE FORMAT VALIDATION
+    // ---------------------------
     if (!/^\d{2}-\d{2}-\d{4}$/.test(selectedDate)) {
-      return res.status(400).json({ message: "Selected date must be in DD-MM-YYYY format" });
+      return res.status(400).json({
+        message: "Selected date must be DD-MM-YYYY",
+      });
     }
 
-    // Validate price and advancePaid
-    if (price < 0) {
-      return res.status(400).json({ message: "Price cannot be negative" });
-    }
-    if (advancePaid < 0) {
-      return res.status(400).json({ message: "Advance paid cannot be negative" });
+    // ---------------------------
+    // 💰 PAYMENT VALIDATION
+    // ---------------------------
+    if (price < 0 || advancePaid < 0) {
+      return res.status(400).json({
+        message: "Price values cannot be negative",
+      });
     }
 
-    // Calculate remaining balance
+    if (advancePaid > price) {
+      return res.status(400).json({
+        message: "Advance paid cannot exceed total price",
+      });
+    }
+
     const remainingBalance = price - advancePaid;
 
-    // Determine payment status
     let paymentStatus = "pending";
     if (advancePaid > 0 && advancePaid < price) {
       paymentStatus = "advance";
@@ -153,10 +207,11 @@ export const createBooking = async (req, res) => {
       paymentStatus = "full";
     }
 
-    // Create the booking
-    const newBooking = new Booking({
+    // ---------------------------
+    // ✅ CREATE BOOKING
+    // ---------------------------
+    const booking = new Booking({
       trip: tripId,
-      user: userId,
       selectedPackage: selectedPackage || null,
       selectedRoomChoice: selectedRoomChoice || null,
       roomCount,
@@ -165,37 +220,27 @@ export const createBooking = async (req, res) => {
       remainingBalance,
       paymentStatus,
       passengers,
-      selectedDate,
       selectedSeats,
-      isReview: false,
-      isReviewActivate: false,
+      selectedDate,
+      hasReview: false,
+      reviewEnabled: false,
       status: "confirmed",
     });
 
-    // Save the booking
-    await newBooking.save();
+    await booking.save();
 
-    // Send confirmation emails
-    const htmlContent = generateBookingConfirmationHTML(newBooking, user);
-    await Promise.all([
-      sendMail({
-        email: user.email,
-        subject: "Booking Confirmation",
-        html: htmlContent,
-      }),
-      sendMail({
-        email: "sunshineholidaypackages@gmail.com",
-        subject: "Booking Confirmation",
-        html: htmlContent,
-      }),
-    ]);
-
-    return res.status(201).json(newBooking);
+    return res.status(201).json({
+      message: "Booking created successfully",
+      booking,
+    });
   } catch (error) {
-    console.error("Error creating booking:", error);
-    return res.status(500).json({ message: error.message || "Server error" });
+    console.error("Create booking error:", error);
+    return res.status(500).json({
+      message: error.message || "Internal server error",
+    });
   }
 };
+
 
 // Update an existing booking
 export const updateBooking = async (req, res) => {
@@ -514,11 +559,11 @@ export const getBookingsByTrip = async (req, res) => {
 export const getTripBookingStats = async (req, res) => {
   try {
     const { tripId } = req.params;
-    console.log(tripId);
-    if (!tripId) {
+
+    if (!tripId || !mongoose.Types.ObjectId.isValid(tripId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Trip ID is required" });
+        .json({ success: false, message: "Valid Trip ID is required" });
     }
 
     const bookings = await Booking.find({ trip: tripId });
@@ -529,64 +574,62 @@ export const getTripBookingStats = async (req, res) => {
         .json({ success: false, message: "No bookings found for this trip" });
     }
 
-    const uniqueUserIds = [
-      ...new Set(bookings.map((booking) => booking.user.toString())),
-    ];
+    // Calculate total passengers and seats
     const totalPassengers = bookings.reduce(
       (total, booking) => total + booking.passengers.length,
       0
     );
-    const totalSeatsBooked = bookings.reduce(
-      (total, booking) => total + booking.selectedSeats.length,
-      0
-    );
 
-    // Group bookings by date with +1 day
+    const totalSeatsBooked = bookings.reduce((total, booking) => {
+      // Handle both numeric seats and "N/A" or "block"
+      return (
+        total +
+        booking.selectedSeats.filter(seat => seat !== "N/A" && seat !== "block")
+          .length
+      );
+    }, 0);
+
+    // Group bookings by selectedDate (DD-MM-YYYY)
     const dailyStats = bookings.reduce((acc, booking) => {
-      console.log(booking.selectedDate);
-      const [day, month, year] = booking.selectedDate.split("-");
-      const dateObj = new Date(year, month - 1, day);
-      dateObj.setDate(dateObj.getDate());
-      const nextDay = `${String(dateObj.getDate()).padStart(2, "0")}-${String(
-        dateObj.getMonth() + 1
-      ).padStart(2, "0")}-${dateObj.getFullYear()}`;
+      const dateKey = booking.selectedDate; // Already in "DD-MM-YYYY" format
 
-      if (!acc[nextDay]) {
-        acc[nextDay] = {
+      if (!acc[dateKey]) {
+        acc[dateKey] = {
+          date: dateKey,
           totalBookings: 0,
           totalPassengers: 0,
           totalSeatsBooked: 0,
         };
       }
-      acc[nextDay].totalBookings += 1;
-      acc[nextDay].totalPassengers += booking.passengers.length;
-      acc[nextDay].totalSeatsBooked += booking.selectedSeats.length;
+
+      acc[dateKey].totalBookings += 1;
+      acc[dateKey].totalPassengers += booking.passengers.length;
+
+      // Count only actual seat numbers (exclude "N/A" and "block")
+      const actualSeats = booking.selectedSeats.filter(
+        seat => seat !== "N/A" && seat !== "block"
+      );
+      acc[dateKey].totalSeatsBooked += actualSeats.length;
+
       return acc;
     }, {});
 
-    // Convert to array and sort by date descending
-    const sortedDailyStats = Object.entries(dailyStats)
-      .map(([date, stats]) => ({ date, ...stats }))
-      .sort((a, b) => {
-        const [dayA, monthA, yearA] = a.date.split("-").map(Number);
-        const [dayB, monthB, yearB] = b.date.split("-").map(Number);
-        return (
-          new Date(yearB, monthB - 1, dayB) - new Date(yearA, monthA - 1, dayA)
-        );
-      });
-
-    console.log(sortedDailyStats);
+    // Convert to sorted array (most recent first)
+    const sortedDailyStats = Object.values(dailyStats).sort((a, b) => {
+      const [dayA, monthA, yearA] = a.date.split("-").map(Number);
+      const [dayB, monthB, yearB] = b.date.split("-").map(Number);
+      return new Date(yearB, monthB - 1, dayB) - new Date(yearA, monthA - 1, dayA);
+    });
 
     return res.status(200).json({
       success: true,
       stats: {
-        uniqueUsers: uniqueUserIds.length,
         totalBookings: bookings.length,
         totalPassengers,
         totalSeatsBooked,
         dailyStats: sortedDailyStats,
       },
-      message: `${uniqueUserIds.length} users have made ${bookings.length} bookings for this trip`,
+      message: `${bookings.length} booking(s) found with ${totalPassengers} total passenger(s)`,
     });
   } catch (error) {
     console.error("Error getting trip booking statistics:", error);
@@ -599,79 +642,84 @@ export const getTripBookingStats = async (req, res) => {
 };
 export const getTripBookingHistory = async (req, res) => {
   try {
-    const { id, date } = req.params; // Get trip ID and selected date from params
-    console.log(date);
+    const { id, date } = req.params; // tripId and selectedDate (DD-MM-YYYY)
+
     if (!id) {
       return res
         .status(400)
         .json({ success: false, message: "Trip ID is required" });
     }
-    if (!date) {
+
+    if (!date || !/^\d{2}-\d{2}-\d{4}$/.test(date)) {
       return res
         .status(400)
-        .json({ success: false, message: "Date is required" });
+        .json({ success: false, message: "Valid date in DD-MM-YYYY format is required" });
     }
 
-    // Convert date param to a Date object and normalize it
-    const inputDate = date; // Given input
-    // const timePart = "T18:30:00.000+00:00"; // Fixed time format
-    // const formattedDate = `${inputDate}${timePart}`;
-    // const selectedDate = formattedDate;
-    // const dateObj = new Date(selectedDate);
-    // dateObj.setDate(dateObj.getDate() - 1);
-    // const result = dateObj.toISOString().replace('Z', '+00:00');
-    // console.log(selectedDate);
-    // console.log(result);
-    const dataDate = inputDate;
+    // Find all bookings for this trip on the exact selectedDate
+    const tripBookings = await Booking.find({
+      trip: id,
+      selectedDate: date,
+    }).populate("trip"); // Only populate trip, no user
 
-    // console.log(selectedDate,"");
-    // Find any booking that matches the trip ID and date
-    const booking = await Booking.findOne({ trip: id, selectedDate: dataDate })
-      .populate("trip")
-      .populate("user");
-    console.log(dataDate);
-    if (!booking) {
+    if (!tripBookings || tripBookings.length === 0) {
       return res
         .status(404)
         .json({ success: false, message: "No bookings found for this date" });
     }
 
-    // Fetch all bookings for the same trip on the selected date
-    const tripBookings = await Booking.find({
-      trip: id,
-      selectedDate: dataDate,
-    }).populate("user");
-    console.log(tripBookings);
-    // Construct purchase history details
+    // Get trip details from the first booking (all share the same trip)
+    const trip = tripBookings[0].trip;
+
+    // Find the matching startDate to get seat capacity
+    const matchingStartDate = trip.startDates.find((sd) => sd.date === date);
+    const totalSeatsAvailable = matchingStartDate?.seats || 0;
+
+    // Calculate booked seats (only count numeric seats, ignore "N/A" or "block")
+    const bookedSeatsCount = tripBookings.reduce((total, booking) => {
+      return (
+        total +
+        booking.selectedSeats.filter(
+          (seat) => seat !== "N/A" && seat !== "block" && /^\d+$/.test(seat)
+        ).length
+      );
+    }, 0);
+
+    // Construct purchase history (guest-friendly)
     const purchaseHistory = tripBookings.map((booking) => ({
       bookingId: booking._id,
-
-      user: {
-        id: booking?.user?._id || "",
-        name: booking?.user?.name || "",
-        email: booking?.user?.email || "",
+      leadPassenger: {
+        name: booking.passengers[0]?.name || "Guest",
+        phoneNumber: booking.passengers[0]?.phoneNumber || "N/A",
       },
       totalPassengers: booking.passengers.length,
       selectedSeats: booking.selectedSeats,
-      isReviewActivate: booking.selectedSeats,
       price: booking.price,
-      remainingBalance:booking.remainingBalance,
-      advancePaid:booking.advancePaid
+      advancePaid: booking.advancePaid,
+      remainingBalance: booking.remainingBalance,
+      paymentStatus: booking.paymentStatus,
+      status: booking.status,
+      hasReview: booking.hasReview,
+      reviewEnabled: booking.reviewEnabled,
+      createdAt: booking.createdAt,
     }));
-const totalSeats = booking.trip.startDates.filter((i) =>       i.date===date)
 
     return res.status(200).json({
       success: true,
       tripDetails: {
-        tripId: booking.trip._id,
-        tripName: booking.trip.name,
-        tripDestination: booking.trip.destination,
-        tripDate: booking.trip.date,
-        totalSeat:totalSeats[0]?.seats||0,
+        tripId: trip._id,
+        tripName: trip.name || trip.location,
+        destination: trip.category || trip.location,
+        date: date,
+        totalSeatsAvailable,
+        bookedSeatsCount,
+        availableSeats: totalSeatsAvailable - bookedSeatsCount,
       },
       selectedDate: date,
-      purchaseHistory, // List of all bookings on the selected date
-      message: `Purchase history for trip ID ${booking.trip._id} on ${date} retrieved successfully.`,
+      totalBookings: tripBookings.length,
+      totalPassengers: tripBookings.reduce((sum, b) => sum + b.passengers.length, 0),
+      purchaseHistory,
+      message: `${tripBookings.length} booking(s) found for ${date}`,
     });
   } catch (error) {
     console.error("Error getting trip booking history:", error);
@@ -683,67 +731,130 @@ const totalSeats = booking.trip.startDates.filter((i) =>       i.date===date)
   }
 };
 
+
+
 export const getTripBookingStatsOfTrip = async (req, res) => {
   try {
     const { tripId } = req.params;
     const { selectedDate: querySelectedDate } = req.query;
-    console.log(querySelectedDate);
-    if (!tripId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Trip ID is required" });
+
+    if (!tripId || !mongoose.Types.ObjectId.isValid(tripId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid Trip ID is required",
+      });
     }
 
     const filter = { trip: tripId };
 
-    // Handle date filtering if provided
     if (querySelectedDate) {
-      // Use the formatted date string for exact matching
+      if (!/^\d{2}-\d{2}-\d{4}$/.test(querySelectedDate)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid date format. Use DD-MM-YYYY",
+        });
+      }
       filter.selectedDate = querySelectedDate;
     }
 
-    const bookings = await Booking.find(filter);
+    const bookings = await Booking.find(filter).populate("trip");
 
     if (!bookings.length) {
-      return res.status(404).json({
-        success: false,
-        message: "No bookings found for this trip and date",
+      return res.status(200).json({
+        success: true,
+        stats: {
+          totalBookings: 0,
+          totalPassengers: 0,
+          totalSeatsBooked: 0,
+          availableSeats: 0,
+          totalAvailableSeats: 0,
+          uniqueCustomers: 0,
+        },
+        selectedSeatsByBus: {},
+        message: "No bookings found",
       });
     }
 
-    // Calculate booking statistics
-    const uniqueUserIds = [
-      ...new Set(bookings.map((booking) => booking.user.toString())),
-    ];
+    /* ---------------------------------- */
+    /* 🚌 CORRECT BUS-AWARE SEAT PARSING   */
+    /* ---------------------------------- */
+
+    const selectedSeatsByBus = {}; // { busIndex: [seatNo] }
+    let totalSeatsBooked = 0;
+
+    bookings.forEach((booking) => {
+      booking.selectedSeats.forEach((seatObj) => {
+        // Ignore N/A seats
+        if (!seatObj || seatObj.seat === "N/A") return;
+
+        const { seat, busIndex } = seatObj;
+
+        if (typeof seat === "string" && typeof busIndex === "number") {
+          if (!selectedSeatsByBus[busIndex]) {
+            selectedSeatsByBus[busIndex] = [];
+          }
+
+          selectedSeatsByBus[busIndex].push(seat);
+          totalSeatsBooked++;
+        }
+      });
+    });
+
+    /* ---------------------------------- */
+    /* 📊 OTHER STATS                     */
+    /* ---------------------------------- */
 
     const totalPassengers = bookings.reduce(
-      (total, booking) => total + booking.passengers.length,
+      (sum, b) => sum + (b.passengers?.length || 0),
       0
     );
 
-    const totalSeatsBooked = bookings.reduce(
-      (total, booking) => total + booking.selectedSeats.length,
-      0
-    );
+    const uniqueCustomers = new Set(
+      bookings
+        .map((b) => b.passengers?.[0]?.phoneNumber)
+        .filter(Boolean)
+    ).size;
 
-    // Get all selected seats across bookings
-    const allSelectedSeats = bookings.flatMap(
-      (booking) => booking.selectedSeats
-    );
+    /* ---------------------------------- */
+    /* 🧮 TOTAL CAPACITY                  */
+    /* ---------------------------------- */
+
+    let seatsPerBus = 0;
+    let numberOfBusesAvailable = 1;
+
+    const trip = bookings[0].trip;
+
+    if (trip?.startDates && querySelectedDate) {
+      const matchingDate = trip.startDates.find(
+        (sd) => sd.date === querySelectedDate
+      );
+
+      if (matchingDate) {
+        seatsPerBus = Number(matchingDate.seats || 0);
+        numberOfBusesAvailable = Number(
+          matchingDate.numberOfBusesAvailable || 1
+        );
+      }
+    }
+
+    const totalAvailableSeats = seatsPerBus * numberOfBusesAvailable;
+    const availableSeats = totalAvailableSeats - totalSeatsBooked;
 
     return res.status(200).json({
       success: true,
       stats: {
-        uniqueUsers: uniqueUserIds.length,
         totalBookings: bookings.length,
         totalPassengers,
         totalSeatsBooked,
+        availableSeats,
+        totalAvailableSeats,
+        uniqueCustomers,
+        seatsPerBus,
+        numberOfBusesAvailable,
       },
-      selectedSeats: allSelectedSeats,
-      selectedDate: querySelectedDate ? querySelectedDate : "all dates",
-      message: `For trip ${tripId} on ${
-        querySelectedDate || "all dates"
-      }: ${totalSeatsBooked} seats booked`,
+      selectedSeatsByBus,
+      selectedDate: querySelectedDate,
+      message: "Seat stats fetched successfully",
     });
   } catch (error) {
     console.error("Error getting trip booking statistics:", error);
@@ -754,6 +865,8 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
     });
   }
 };
+
+
 
 export const requestRefund = async (req, res) => {
   try {

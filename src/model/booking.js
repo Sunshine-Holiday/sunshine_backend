@@ -1,16 +1,25 @@
 import mongoose from "mongoose";
+const seatSchema = new mongoose.Schema(
+  {
+    seat: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    busIndex: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false }
+);
 
 const passengerSchema = new mongoose.Schema({
   phoneNumber: {
     type: String,
     required: true,
     trim: true,
-    // validate: {
-    //   // validator: function(v) {
-    //   //   // return /^\+?\d{10,15}$/.test(v); // Validates phone number (10-15 digits, optional +)
-    //   // },
-    //   message: "Invalid phone number format",
-    // },
   },
   name: { type: String, required: true, trim: true },
   age: {
@@ -25,14 +34,6 @@ const passengerSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    // validate: {
-    //   // validator: function(v) {
-    //   //   // if (this.idProof === "aadhar") return /^\d{12}$/.test(v); // 12-digit Aadhar
-    //   //   if (this.idProof === "pan") return /^[A-Z]{5}\d{4}[A-Z]{1}$/.test(v); // 10-char PAN
-    //   //   return false;
-    //   // },
-    //   message: "Invalid ID proof number format",
-    // },
   },
   address: { type: String, trim: true },
 });
@@ -44,11 +45,8 @@ const bookingSchema = new mongoose.Schema(
       ref: "Trip",
       required: true,
     },
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
+    // user field has been removed
+
     selectedPackage: {
       type: mongoose.Schema.Types.ObjectId, // Sub-document ID from Trip.packages
       default: null,
@@ -100,16 +98,22 @@ const bookingSchema = new mongoose.Schema(
     },
     passengers: [passengerSchema],
     selectedDate: { type: String, required: true },
-    selectedSeats: {
-      type: [String],
-      required: true,
-      validate: {
-        validator: function (v) {
-          return v.every((seat) => seat === "N/A" || /^\d+$/.test(seat));
-        },
-        message: "Seats must be 'N/A' or numeric",
-      },
+ selectedSeats: {
+  type: [seatSchema],
+  required: true,
+  validate: {
+    validator: function (v) {
+      return v.every(
+        (s) =>
+          typeof s.seat === "string" &&
+          typeof s.busIndex === "number" &&
+          s.busIndex >= 0
+      );
     },
+    message: "Each seat must contain seat number and busIndex",
+  },
+},
+
     hasReview: {
       type: Boolean,
       default: false,
