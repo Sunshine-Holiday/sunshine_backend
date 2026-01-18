@@ -198,170 +198,234 @@ export const getTripById = async (req, res) => {
 };
 
 
+
+
 export const updateTrip = async (req, res) => {
-  const id = req.params.id;
-  const {
-    title,
-    price,
-    location,
-    description,
-    startDates,
-    category,
-    amenities,
-    boardingPoints,
-    packages,
-    roomChoices,
-    advancePaymentPercentage,
-    discountPercentage,
-    readonly
-  } = req.body;
-
-  const file = req.file;
-
-  // Parse arrays from form data
-  const parsedAmenities = Array.isArray(amenities)
-    ? amenities
-    : amenities
-    ? JSON.parse(amenities)
-    : [];
-
-  const parsedBoardingPoints = Array.isArray(boardingPoints)
-    ? boardingPoints
-    : boardingPoints
-    ? JSON.parse(boardingPoints)
-    : [];
-
-  const parsedStartDates = Array.isArray(startDates)
-    ? startDates
-    : startDates
-    ? (() => {
-        try {
-          const parsed = JSON.parse(startDates);
-          return Array.isArray(parsed) ? parsed : [parsed];
-        } catch (e) {
-          return [];
-        }
-      })()
-    : [];
-
-  const parsedPackages = Array.isArray(packages)
-    ? packages
-    : packages
-    ? (() => {
-        try {
-          const parsed = JSON.parse(packages);
-          return Array.isArray(parsed) ? parsed : [parsed];
-        } catch (e) {
-          return [];
-        }
-      })()
-    : [];
-
-  const parsedRoomChoices = Array.isArray(roomChoices)
-    ? roomChoices
-    : roomChoices
-    ? (() => {
-        try {
-          const parsed = JSON.parse(roomChoices);
-          return Array.isArray(parsed) ? parsed : [parsed];
-        } catch (e) {
-          return [];
-        }
-      })()
-    : [];
-
-  // Validate required fields
-  if (title && !title) {
-    return res.status(400).json({ message: "Title is required" });
-  }
-  if (location && !location) {
-    return res.status(400).json({ message: "Location is required" });
-  }
-  if (description && !description) {
-    return res.status(400).json({ message: "Description is required" });
-  }
-  if (category && !category) {
-    return res.status(400).json({ message: "Category is required" });
-  }
-  if (!readonly&&parsedStartDates.length > 0) {
-    for (const startDate of parsedStartDates) {
-      if (startDate.seats !== undefined && startDate.seats !== "block" && (!Number.isInteger(startDate.seats) || startDate.seats <= 0)) {
-        return res.status(400).json({ message: "Seats must be a positive integer if provided" });
-      }
-    }
-  } 
-  if (parsedBoardingPoints.length === 0) {
-    return res.status(400).json({ message: "At least one boarding point is required" });
-  }
-
-  // Validate price and packages
-  const parsedPrice = price ? parseFloat(price) : 0;
-  if (!readonly && parsedPackages.length === 0 && (!parsedPrice || parsedPrice <= 0)) {
-    return res.status(400).json({ message: "Price is required when no packages are provided" });
-  }
-
-  // Validate packages
-  for (const pkg of parsedPackages) {
-    if (!pkg.title) {
-      return res.status(400).json({ message: "Package title is required" });
-    }
-    if (!pkg.personCount || !Number.isInteger(pkg.personCount) || pkg.personCount <= 0) {
-      return res.status(400).json({ message: "Package person count must be a positive integer" });
-    }
-    if (!pkg.price || isNaN(pkg.price) || pkg.price <= 0) {
-      return res.status(400).json({ message: "Package price must be a positive number" });
-    }
-  }
-
-  // Validate roomChoices (optional, but validate if provided)
-  for (const room of parsedRoomChoices) {
-    if (room.description) {
-      // if (!room.personCount || !Number.isInteger(room.personCount) || room.personCount <= 0) {
-      //   return res.status(400).json({ message: "Room choice person count must be a positive integer" });
-      // }
-      if (!room.roomCount || !Number.isInteger(room.roomCount) || room.roomCount <= 0) {
-        return res.status(400).json({ message: "Room choice room count must be a positive integer" });
-      }
-      if (!room.price || isNaN(room.price) || room.price <= 0) {
-        return res.status(400).json({ message: "Room choice price must be a positive number" });
-      }
-    }
-  }
-
-  // Construct update object with only provided fields
-  const updateData = {};
-  if (file?.path) updateData.banner = file.path;
-  if (title) updateData.title = title;
-  if (parsedPrice > 0) updateData.price = parsedPrice;
-  if (location) updateData.location = location;
-  if (description) updateData.description = description;
-  if (parsedStartDates.length > 0) updateData.startDates = parsedStartDates;
-  if (category) updateData.category = category;
-  if (parsedAmenities.length > 0) updateData.amenities = parsedAmenities;
-  if (parsedBoardingPoints.length > 0) updateData.boardingPoints = parsedBoardingPoints;
-  if (parsedPackages.length > 0) updateData.packages = parsedPackages;
-  if (parsedRoomChoices.length > 0) updateData.roomChoices = parsedRoomChoices;
-if (typeof advancePaymentPercentage !== "undefined") {
-  updateData.advancePaymentPercentage = advancePaymentPercentage;
-}
-if (typeof discountPercentage !== "undefined") {
-  updateData.discountPercentage = discountPercentage;
-}
   try {
+    const id = req.params.id;
+
+    const {
+      title,
+      price,
+      location,
+      description,
+      startDates,
+      category,
+      amenities,
+      boardingPoints,
+      packages,
+      roomChoices,
+      advancePaymentPercentage,
+      discountPercentage,
+      readonly,
+    } = req.body;
+
+    const file = req.file;
+
+    // ---------------------------
+    // 🔧 Helpers
+    // ---------------------------
+    const parseArray = (field) => {
+      if (Array.isArray(field)) return field;
+      if (!field) return [];
+      try {
+        const parsed = JSON.parse(field);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+
+    // ---------------------------
+    // 🧠 Parse incoming data
+    // ---------------------------
+    const parsedAmenities = parseArray(amenities);
+    const parsedBoardingPoints = parseArray(boardingPoints);
+    const parsedStartDates = parseArray(startDates);
+    const parsedPackages = parseArray(packages);
+    const parsedRoomChoices = parseArray(roomChoices);
+
+    const parsedPrice =
+      price !== undefined && price !== "" ? Number(price) : 0;
+
+    // ---------------------------
+    // ❗ BASIC VALIDATIONS
+    // ---------------------------
+    if (!title)
+      return res.status(400).json({ message: "Title is required" });
+
+    if (!location)
+      return res.status(400).json({ message: "Location is required" });
+
+    if (!description)
+      return res.status(400).json({ message: "Description is required" });
+
+    if (!category)
+      return res.status(400).json({ message: "Category is required" });
+
+    if (!readonly && parsedStartDates.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "At least one start date is required" });
+    }
+
+    if (parsedBoardingPoints.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "At least one boarding point is required" });
+    }
+
+    // ---------------------------
+    // 🚌 START DATES VALIDATION
+    // ---------------------------
+    for (const date of parsedStartDates) {
+      // Convert buses to NUMBER (IMPORTANT FIX)
+      const buses = Number(date.numberOfBusesAvailable);
+
+      if (!Number.isInteger(buses) || buses <= 0) {
+        return res
+          .status(400)
+          .json({ message: "Invalid number of buses" });
+      }
+
+      // normalize back to STRING (schema expects string)
+      date.numberOfBusesAvailable = String(buses);
+
+      // Seats validation
+      if (
+        date.seats !== "block" &&
+        (!Number.isInteger(date.seats) || date.seats <= 0)
+      ) {
+        return res
+          .status(400)
+          .json({ message: "Invalid seat count" });
+      }
+    }
+
+    // ---------------------------
+    // 💰 PRICE / PACKAGE RULE
+    // ---------------------------
+    if (
+      !readonly &&
+      parsedPackages.length === 0 &&
+      (!parsedPrice || parsedPrice <= 0)
+    ) {
+      return res.status(400).json({
+        message: "Price is required when no packages are provided",
+      });
+    }
+
+    // ---------------------------
+    // 📦 PACKAGE VALIDATION
+    // ---------------------------
+    for (const pkg of parsedPackages) {
+      if (!pkg.title) {
+        return res
+          .status(400)
+          .json({ message: "Package title is required" });
+      }
+
+      if (!Number.isInteger(pkg.personCount) || pkg.personCount <= 0) {
+        return res.status(400).json({
+          message: "Package person count must be a positive integer",
+        });
+      }
+
+      if (!pkg.price || pkg.price <= 0) {
+        return res
+          .status(400)
+          .json({ message: "Package price must be positive" });
+      }
+    }
+
+    // ---------------------------
+    // 🏨 ROOM VALIDATION
+    // ---------------------------
+    for (const room of parsedRoomChoices) {
+      if (room.description) {
+        if (!Number.isInteger(room.roomCount) || room.roomCount <= 0) {
+          return res.status(400).json({
+            message: "Room count must be a positive integer",
+          });
+        }
+
+        if (!room.price || room.price <= 0) {
+          return res
+            .status(400)
+            .json({ message: "Room price must be positive" });
+        }
+      }
+    }
+
+    // ---------------------------
+    // 📊 PERCENTAGE VALIDATION
+    // ---------------------------
+    if (
+      advancePaymentPercentage !== undefined &&
+      (advancePaymentPercentage < 0 || advancePaymentPercentage > 100)
+    ) {
+      return res.status(400).json({
+        message: "Advance payment must be between 0 and 100",
+      });
+    }
+
+    if (
+      discountPercentage !== undefined &&
+      (discountPercentage < 0 || discountPercentage > 100)
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Discount must be between 0 and 100" });
+    }
+
+    // ---------------------------
+    // 🧾 UPDATE OBJECT
+    // ---------------------------
+    const updateData = {
+      title,
+      location,
+      description,
+      category,
+      price: parsedPrice,
+      startDates: parsedStartDates,
+      amenities: parsedAmenities,
+      boardingPoints: parsedBoardingPoints,
+      packages: parsedPackages,     // ✅ empty array allowed
+      roomChoices: parsedRoomChoices, // ✅ empty array allowed
+    };
+
+    if (file?.path) {
+      updateData.banner = file.path;
+    }
+
+    if (advancePaymentPercentage !== undefined) {
+      updateData.advancePaymentPercentage = advancePaymentPercentage;
+    }
+
+    if (discountPercentage !== undefined) {
+      updateData.discountPercentage = discountPercentage;
+    }
+
+    // ---------------------------
+    // 🚀 UPDATE DB
+    // ---------------------------
     const updatedTrip = await Trip.findByIdAndUpdate(
       id,
       { $set: updateData },
       { new: true }
     );
+
     if (!updatedTrip) {
       return res.status(404).json({ message: "Trip not found" });
     }
+
     res.status(200).json(updatedTrip);
   } catch (error) {
-    console.error("Error updating trip:", error);
+    console.error("Update trip error:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 export const deleteTrip = async (req, res) => {
   try {
     const id = req.params.id;

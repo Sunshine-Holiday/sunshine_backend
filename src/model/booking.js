@@ -22,6 +22,7 @@ const passengerSchema = new mongoose.Schema({
     trim: true,
   },
   name: { type: String, required: true, trim: true },
+  email: { type: String, required: true, trim: true },
   age: {
     type: Number,
     required: true,
@@ -98,21 +99,21 @@ const bookingSchema = new mongoose.Schema(
     },
     passengers: [passengerSchema],
     selectedDate: { type: String, required: true },
- selectedSeats: {
-  type: [seatSchema],
-  required: true,
-  validate: {
-    validator: function (v) {
-      return v.every(
-        (s) =>
-          typeof s.seat === "string" &&
-          typeof s.busIndex === "number" &&
-          s.busIndex >= 0
-      );
+    selectedSeats: {
+      type: [seatSchema],
+      required: true,
+      validate: {
+        validator: function (v) {
+          return v.every(
+            (s) =>
+              typeof s.seat === "string" &&
+              typeof s.busIndex === "number" &&
+              s.busIndex >= 0
+          );
+        },
+        message: "Each seat must contain seat number and busIndex",
+      },
     },
-    message: "Each seat must contain seat number and busIndex",
-  },
-},
 
     hasReview: {
       type: Boolean,

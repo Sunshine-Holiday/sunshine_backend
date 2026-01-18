@@ -228,6 +228,29 @@ export const createBooking = async (req, res) => {
     });
 
     await booking.save();
+    const emailPromises = booking.passengers.map((passenger) => {
+  const htmlContent = generateBookingConfirmationHTML(booking, passenger);
+
+  return sendMail({
+    email: passenger.email,
+    subject: "Booking Confirmation",
+    html: htmlContent,
+  });
+});
+
+// Admin copy
+emailPromises.push(
+  sendMail({
+    email: "sunshineholidaypackages@gmail.com",
+    subject: "New Booking Confirmation",
+    html: generateBookingConfirmationHTML(
+      booking,
+      booking.passengers[0] // primary passenger
+    ),
+  })
+);
+
+await Promise.all(emailPromises);
 
     return res.status(201).json({
       message: "Booking created successfully",
