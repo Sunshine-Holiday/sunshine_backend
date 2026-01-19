@@ -15,34 +15,40 @@ import {
   getProcessingBookings,
   updateBookingSeats,
   deleteBookingSeats,
+  getDayWiseBookings,
 } from "../controller/booking.js";
 import { adminOnly, isAuthenticated } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// ================= REPORTS (STATIC FIRST) =================
+router.get("/day-wise", isAuthenticated, adminOnly, getDayWiseBookings);
+router.get("/process", isAuthenticated, adminOnly, getProcessingBookings);
+
+// ================= USER =================
 router.get("/user", isAuthenticated, getAllBookingsByUserId);
-// Admin-only booking operations
+
+// ================= TRIP =================
+router.get("/trip/:tripId", getBookingsByTrip);
+router.get("/stats/:tripId", isAuthenticated, adminOnly, getTripBookingStats);
+router.get("/stats/trip-date/:tripId", isAuthenticated, getTripBookingStatsOfTrip);
+router.get("/history/:id/:date", getTripBookingHistory);
+
+// ================= CRUD =================
 router.get("/", isAuthenticated, adminOnly, getAllBookings);
+router.post("/", createBooking);
 router.put("/:id", isAuthenticated, adminOnly, updateBooking);
 router.delete("/:id", isAuthenticated, adminOnly, deleteBooking);
-router.get("/process", isAuthenticated, adminOnly, getProcessingBookings);
-// Retrieve booking details
-router.get("/:id", isAuthenticated, getBookingById);
-router.get("/trip/:tripId", getBookingsByTrip);
-router.get("/stats/:tripId", getTripBookingStats);
-router.get("/history/:id/:date", getTripBookingHistory);
-// User-specific bookings
-router.get(
-  "/stats/trip-date/:tripId",
-  isAuthenticated,
-  getTripBookingStatsOfTrip
-);
-// Create a new booking
-router.post("/", createBooking);
+
+// ================= REFUND =================
 router.post("/request", isAuthenticated, requestRefund);
+router.post("/process", isAuthenticated, adminOnly, processRefund);
+
+// ================= SEATS =================
 router.put("/update/:bookingId", isAuthenticated, updateBookingSeats);
 router.delete("/delete/:bookingId", isAuthenticated, deleteBookingSeats);
-// Admin routes
-router.post("/process", isAuthenticated, adminOnly, processRefund);
+
+// ❗❗ MUST BE ABSOLUTELY LAST ❗❗
+router.get("/:id", isAuthenticated, getBookingById);
 
 export default router;

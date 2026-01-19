@@ -1153,3 +1153,62 @@ export const deleteBookingSeats = async (req, res) => {
     });
   }
 };
+export const getDayWiseBookings = async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: "Date is required (YYYY-MM-DD)",
+      });
+    }
+
+    // Convert date string to start & end of the day
+    const startDate = new Date(`${date}T00:00:00.000Z`);
+    const endDate = new Date(`${date}T23:59:59.999Z`);
+
+    const bookings = await Booking.find({
+      createdAt: { $gte: startDate, $lte: endDate },
+    })
+      .populate("trip", "title price")
+      .sort({ createdAt: -1 });
+
+    let totalSales = 0;
+
+    const formattedBookings = bookings.map((booking) => {
+      totalSales += booking.price;
+
+      return {
+        bookingId: booking._id,
+        tripName: booking.trip?.title || "",
+        tripPrice: booking.price,
+        bookingDate: booking.createdAt,
+
+        passengers: booking.passengers.map((p) => ({
+          name: p.name,
+          email: p.email,
+          phoneNumber: p.phoneNumber,
+          idProof: p.idProof,
+          idProofNumber: p.idProofNumber,
+          age: p.age,
+          gender: p.gender,
+        })),
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      date,
+      totalBookings: bookings.length,
+      totalSales,
+      bookings: formattedBookings,
+    });
+  } catch (error) {
+    console.error("Day-wise booking error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
