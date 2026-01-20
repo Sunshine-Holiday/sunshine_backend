@@ -33,13 +33,18 @@ const checkRequiredFields = (fields, res) => {
 
   //   console.log({ tripId, userId, price, passengers, selectedDate, selectedSeats })
 
-  if (!tripId  || !price || !selectedDate || !selectedSeats) {
+  if (!tripId || !price || !selectedDate || !selectedSeats) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 };
 
 // Create a new booking
 
+
+
+/**
+ * CREATE BOOKING CONTROLLER
+ */
 export const createBooking = async (req, res) => {
   try {
     const {
@@ -52,20 +57,32 @@ export const createBooking = async (req, res) => {
       selectedDate,
       passengers,
       selectedSeats,
+      isadminBooking = false,
     } = req.body;
+
+    console.log("Create Booking Request Body:", req.body);
 
     // ---------------------------
     // 🔴 REQUIRED FIELD CHECK
     // ---------------------------
     if (
       !tripId ||
-      !price ||
+      price === undefined ||
       !selectedDate ||
       !Array.isArray(passengers) ||
       !Array.isArray(selectedSeats)
     ) {
       return res.status(400).json({
         message: "Missing required booking fields",
+      });
+    }
+
+    // ---------------------------
+    // 📅 DATE FORMAT VALIDATION (EARLY)
+    // ---------------------------
+    if (!/^\d{2}-\d{2}-\d{4}$/.test(selectedDate)) {
+      return res.status(400).json({
+        message: "Selected date must be DD-MM-YYYY",
       });
     }
 
@@ -84,10 +101,7 @@ export const createBooking = async (req, res) => {
     // ---------------------------
     // 📦 PACKAGE / ROOM VALIDATION
     // ---------------------------
-    if (
-      selectedPackage &&
-      !mongoose.Types.ObjectId.isValid(selectedPackage)
-    ) {
+    if (selectedPackage && !mongoose.Types.ObjectId.isValid(selectedPackage)) {
       return res.status(400).json({ message: "Invalid package ID" });
     }
 
@@ -114,13 +128,16 @@ export const createBooking = async (req, res) => {
     // ---------------------------
     // 👤 PASSENGER VALIDATION
     // ---------------------------
-    const validPassengers = passengers.every((p) =>
-      p.name &&
-      p.age &&
-      ["male", "female", "other"].includes(p.gender) &&
-      ["aadhar", "pan"].includes(p.idProof) &&
-      p.idProofNumber &&
-      p.phoneNumber
+    const validPassengers = passengers.every(
+      (p) =>
+        p.name &&
+        p.age &&
+        ["male", "female", "other"].includes(p.gender) &&
+        ["aadhar", "pan"].includes(p.idProof) &&
+        p.idProofNumber &&
+        p.phoneNumber &&
+        p.email &&
+        /^\S+@\S+\.\S+$/.test(p.email)
     );
 
     if (!validPassengers) {
@@ -130,11 +147,17 @@ export const createBooking = async (req, res) => {
     }
 
     // ---------------------------
-    // 🪑 SEAT VALIDATION (MULTI BUS)
+    // 🪑 SEAT VALIDATION
     // ---------------------------
     if (selectedSeats.length === 0) {
       return res.status(400).json({
         message: "At least one seat is required",
+      });
+    }
+
+    if (selectedSeats.length !== passengers.length) {
+      return res.status(400).json({
+        message: "Number of seats must match number of passengers",
       });
     }
 
@@ -153,7 +176,7 @@ export const createBooking = async (req, res) => {
     }
 
     // ---------------------------
-    // 🔒 OPTIONAL: PREVENT DOUBLE BOOKING
+    // 🔒 PREVENT DOUBLE BOOKING
     // ---------------------------
     const seatConflicts = await Booking.findOne({
       trip: tripId,
@@ -175,15 +198,6 @@ export const createBooking = async (req, res) => {
     }
 
     // ---------------------------
-    // 📅 DATE FORMAT VALIDATION
-    // ---------------------------
-    if (!/^\d{2}-\d{2}-\d{4}$/.test(selectedDate)) {
-      return res.status(400).json({
-        message: "Selected date must be DD-MM-YYYY",
-      });
-    }
-
-    // ---------------------------
     // 💰 PAYMENT VALIDATION
     // ---------------------------
     if (price < 0 || advancePaid < 0) {
@@ -201,16 +215,13 @@ export const createBooking = async (req, res) => {
     const remainingBalance = price - advancePaid;
 
     let paymentStatus = "pending";
-    if (advancePaid > 0 && advancePaid < price) {
-      paymentStatus = "advance";
-    } else if (advancePaid >= price) {
-      paymentStatus = "full";
-    }
+    if (advancePaid > 0 && advancePaid < price) paymentStatus = "advance";
+    if (advancePaid >= price) paymentStatus = "full";
 
     // ---------------------------
     // ✅ CREATE BOOKING
     // ---------------------------
-    const booking = new Booking({
+    const booking = await Booking.create({
       trip: tripId,
       selectedPackage: selectedPackage || null,
       selectedRoomChoice: selectedRoomChoice || null,
@@ -224,33 +235,42 @@ export const createBooking = async (req, res) => {
       selectedDate,
       hasReview: false,
       reviewEnabled: false,
-      status: "confirmed",
+      status: paymentStatus === "pending" ? "pending" : "confirmed",
     });
 
-    await booking.save();
-    const emailPromises = booking.passengers.map((passenger) => {
-  const htmlContent = generateBookingConfirmationHTML(booking, passenger);
+    // ---------------------------
+    // 📩 SEND EMAILS (WITH TRIP DATA)
+    // ---------------------------
+    if (!isadminBooking) {
+      const populatedBooking = await Booking.findById(booking._id).populate(
+        "trip"
+      );
 
-  return sendMail({
-    email: passenger.email,
-    subject: "Booking Confirmation",
-    html: htmlContent,
-  });
-});
+      const emailPromises = populatedBooking.passengers.map((passenger) =>
+        sendMail({
+          email: passenger.email,
+          subject: "Booking Confirmation",
+          html: generateBookingConfirmationHTML(
+            populatedBooking,
+            passenger
+          ),
+        })
+      );
 
-// Admin copy
-emailPromises.push(
-  sendMail({
-    email: "sunshineholidaypackages@gmail.com",
-    subject: "New Booking Confirmation",
-    html: generateBookingConfirmationHTML(
-      booking,
-      booking.passengers[0] // primary passenger
-    ),
-  })
-);
+      // Admin copy
+      emailPromises.push(
+        sendMail({
+          email: "sunshineholidaypackages@gmail.com",
+          subject: "New Booking Confirmation",
+          html: generateBookingConfirmationHTML(
+            populatedBooking,
+            populatedBooking.passengers[0]
+          ),
+        })
+      );
 
-await Promise.all(emailPromises);
+      await Promise.all(emailPromises);
+    }
 
     return res.status(201).json({
       message: "Booking created successfully",
@@ -275,7 +295,7 @@ export const updateBooking = async (req, res) => {
     // Check for required fields
     const missingFieldsError = checkRequiredFields(
       { tripId, userId, price, passengers, selectedDate, selectedSeats },
-      res
+      res,
     );
     if (missingFieldsError) return missingFieldsError;
 
@@ -408,13 +428,14 @@ export const getAllBookings = async (req, res) => {
   }
 };
 
-
 export const getAllBookingsByUserId = async (req, res) => {
   const { _id } = req.user; // Extract the user ID from the request
   console.log("User ID:", _id);
 
   if (!_id) {
-    return res.status(401).json({ message: "User ID is required to get access" });
+    return res
+      .status(401)
+      .json({ message: "User ID is required to get access" });
   }
 
   try {
@@ -446,24 +467,27 @@ export const getAllBookingsByUserId = async (req, res) => {
       .map((booking) => {
         // Transform selectedDate to DD-MM-YYYY string
         const selectedDate = booking.selectedDate
-          ? new Date(booking.selectedDate).toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }).split("/").join("-")
+          ? new Date(booking.selectedDate)
+              .toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              })
+              .split("/")
+              .join("-")
           : "N/A";
 
         // Find the selectedPackage from trip.packages
         const selectedPackage = booking.selectedPackage
           ? booking.trip.packages.find((pkg) =>
-              pkg._id.equals(booking.selectedPackage)
+              pkg._id.equals(booking.selectedPackage),
             )
           : null;
 
         // Find the selectedRoomChoice from trip.roomChoices
         const selectedRoomChoice = booking.selectedRoomChoice
           ? booking.trip.roomChoices.find((room) =>
-              room._id.equals(booking.selectedRoomChoice)
+              room._id.equals(booking.selectedRoomChoice),
             )
           : null;
 
@@ -600,15 +624,16 @@ export const getTripBookingStats = async (req, res) => {
     // Calculate total passengers and seats
     const totalPassengers = bookings.reduce(
       (total, booking) => total + booking.passengers.length,
-      0
+      0,
     );
 
     const totalSeatsBooked = bookings.reduce((total, booking) => {
       // Handle both numeric seats and "N/A" or "block"
       return (
         total +
-        booking.selectedSeats.filter(seat => seat !== "N/A" && seat !== "block")
-          .length
+        booking.selectedSeats.filter(
+          (seat) => seat !== "N/A" && seat !== "block",
+        ).length
       );
     }, 0);
 
@@ -630,7 +655,7 @@ export const getTripBookingStats = async (req, res) => {
 
       // Count only actual seat numbers (exclude "N/A" and "block")
       const actualSeats = booking.selectedSeats.filter(
-        seat => seat !== "N/A" && seat !== "block"
+        (seat) => seat !== "N/A" && seat !== "block",
       );
       acc[dateKey].totalSeatsBooked += actualSeats.length;
 
@@ -641,7 +666,9 @@ export const getTripBookingStats = async (req, res) => {
     const sortedDailyStats = Object.values(dailyStats).sort((a, b) => {
       const [dayA, monthA, yearA] = a.date.split("-").map(Number);
       const [dayB, monthB, yearB] = b.date.split("-").map(Number);
-      return new Date(yearB, monthB - 1, dayB) - new Date(yearA, monthA - 1, dayA);
+      return (
+        new Date(yearB, monthB - 1, dayB) - new Date(yearA, monthA - 1, dayA)
+      );
     });
 
     return res.status(200).json({
@@ -676,7 +703,10 @@ export const getTripBookingHistory = async (req, res) => {
     if (!date || !/^\d{2}-\d{2}-\d{4}$/.test(date)) {
       return res
         .status(400)
-        .json({ success: false, message: "Valid date in DD-MM-YYYY format is required" });
+        .json({
+          success: false,
+          message: "Valid date in DD-MM-YYYY format is required",
+        });
     }
 
     // Find all bookings for this trip on the exact selectedDate
@@ -703,7 +733,7 @@ export const getTripBookingHistory = async (req, res) => {
       return (
         total +
         booking.selectedSeats.filter(
-          (seat) => seat !== "N/A" && seat !== "block" && /^\d+$/.test(seat)
+          (seat) => seat !== "N/A" && seat !== "block" && /^\d+$/.test(seat),
         ).length
       );
     }, 0);
@@ -740,7 +770,10 @@ export const getTripBookingHistory = async (req, res) => {
       },
       selectedDate: date,
       totalBookings: tripBookings.length,
-      totalPassengers: tripBookings.reduce((sum, b) => sum + b.passengers.length, 0),
+      totalPassengers: tripBookings.reduce(
+        (sum, b) => sum + b.passengers.length,
+        0,
+      ),
       purchaseHistory,
       message: `${tripBookings.length} booking(s) found for ${date}`,
     });
@@ -753,8 +786,6 @@ export const getTripBookingHistory = async (req, res) => {
     });
   }
 };
-
-
 
 export const getTripBookingStatsOfTrip = async (req, res) => {
   try {
@@ -829,13 +860,11 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
 
     const totalPassengers = bookings.reduce(
       (sum, b) => sum + (b.passengers?.length || 0),
-      0
+      0,
     );
 
     const uniqueCustomers = new Set(
-      bookings
-        .map((b) => b.passengers?.[0]?.phoneNumber)
-        .filter(Boolean)
+      bookings.map((b) => b.passengers?.[0]?.phoneNumber).filter(Boolean),
     ).size;
 
     /* ---------------------------------- */
@@ -849,13 +878,13 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
 
     if (trip?.startDates && querySelectedDate) {
       const matchingDate = trip.startDates.find(
-        (sd) => sd.date === querySelectedDate
+        (sd) => sd.date === querySelectedDate,
       );
 
       if (matchingDate) {
         seatsPerBus = Number(matchingDate.seats || 0);
         numberOfBusesAvailable = Number(
-          matchingDate.numberOfBusesAvailable || 1
+          matchingDate.numberOfBusesAvailable || 1,
         );
       }
     }
@@ -888,8 +917,6 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
     });
   }
 };
-
-
 
 export const requestRefund = async (req, res) => {
   try {
@@ -1164,7 +1191,7 @@ export const getDayWiseBookings = async (req, res) => {
       });
     }
 
-    // Convert date string to start & end of the day
+    // Start & end of the selected day (UTC-safe)
     const startDate = new Date(`${date}T00:00:00.000Z`);
     const endDate = new Date(`${date}T23:59:59.999Z`);
 
@@ -1175,15 +1202,26 @@ export const getDayWiseBookings = async (req, res) => {
       .sort({ createdAt: -1 });
 
     let totalSales = 0;
+    let totalPaidAmount = 0;
+    let totalRemainingAmount = 0;
 
     const formattedBookings = bookings.map((booking) => {
-      totalSales += booking.price;
+      totalSales += booking.price || 0;
+      totalPaidAmount += booking.advancePaid || 0;
+      totalRemainingAmount += booking.remainingBalance || 0;
 
       return {
         bookingId: booking._id,
         tripName: booking.trip?.title || "",
         tripPrice: booking.price,
         bookingDate: booking.createdAt,
+
+        payment: {
+          totalPrice: booking.price,
+          paidAmount: booking.advancePaid,
+          remainingAmount: booking.remainingBalance,
+          paymentStatus: booking.paymentStatus,
+        },
 
         passengers: booking.passengers.map((p) => ({
           name: p.name,
@@ -1202,6 +1240,8 @@ export const getDayWiseBookings = async (req, res) => {
       date,
       totalBookings: bookings.length,
       totalSales,
+      totalPaidAmount,
+      totalRemainingAmount,
       bookings: formattedBookings,
     });
   } catch (error) {
@@ -1212,3 +1252,4 @@ export const getDayWiseBookings = async (req, res) => {
     });
   }
 };
+
