@@ -40,11 +40,6 @@ const checkRequiredFields = (fields, res) => {
 
 // Create a new booking
 
-
-
-/**
- * CREATE BOOKING CONTROLLER
- */
 export const createBooking = async (req, res) => {
   try {
     const {
@@ -60,29 +55,18 @@ export const createBooking = async (req, res) => {
       isadminBooking = false,
     } = req.body;
 
-    console.log("Create Booking Request Body:", req.body);
-
     // ---------------------------
     // 🔴 REQUIRED FIELD CHECK
     // ---------------------------
     if (
       !tripId ||
-      price === undefined ||
+      !price ||
       !selectedDate ||
       !Array.isArray(passengers) ||
       !Array.isArray(selectedSeats)
     ) {
       return res.status(400).json({
         message: "Missing required booking fields",
-      });
-    }
-
-    // ---------------------------
-    // 📅 DATE FORMAT VALIDATION (EARLY)
-    // ---------------------------
-    if (!/^\d{2}-\d{2}-\d{4}$/.test(selectedDate)) {
-      return res.status(400).json({
-        message: "Selected date must be DD-MM-YYYY",
       });
     }
 
@@ -135,9 +119,7 @@ export const createBooking = async (req, res) => {
         ["male", "female", "other"].includes(p.gender) &&
         ["aadhar", "pan"].includes(p.idProof) &&
         p.idProofNumber &&
-        p.phoneNumber &&
-        p.email &&
-        /^\S+@\S+\.\S+$/.test(p.email)
+        p.phoneNumber,
     );
 
     if (!validPassengers) {
@@ -147,17 +129,11 @@ export const createBooking = async (req, res) => {
     }
 
     // ---------------------------
-    // 🪑 SEAT VALIDATION
+    // 🪑 SEAT VALIDATION (MULTI BUS)
     // ---------------------------
     if (selectedSeats.length === 0) {
       return res.status(400).json({
         message: "At least one seat is required",
-      });
-    }
-
-    if (selectedSeats.length !== passengers.length) {
-      return res.status(400).json({
-        message: "Number of seats must match number of passengers",
       });
     }
 
@@ -166,7 +142,7 @@ export const createBooking = async (req, res) => {
         typeof s === "object" &&
         typeof s.seat === "string" &&
         typeof s.busIndex === "number" &&
-        s.busIndex >= 0
+        s.busIndex >= 0,
     );
 
     if (!seatsAreValid) {
@@ -176,7 +152,7 @@ export const createBooking = async (req, res) => {
     }
 
     // ---------------------------
-    // 🔒 PREVENT DOUBLE BOOKING
+    // 🔒 OPTIONAL: PREVENT DOUBLE BOOKING
     // ---------------------------
     const seatConflicts = await Booking.findOne({
       trip: tripId,
@@ -198,6 +174,15 @@ export const createBooking = async (req, res) => {
     }
 
     // ---------------------------
+    // 📅 DATE FORMAT VALIDATION
+    // ---------------------------
+    if (!/^\d{2}-\d{2}-\d{4}$/.test(selectedDate)) {
+      return res.status(400).json({
+        message: "Selected date must be DD-MM-YYYY",
+      });
+    }
+
+    // ---------------------------
     // 💰 PAYMENT VALIDATION
     // ---------------------------
     if (price < 0 || advancePaid < 0) {
@@ -215,13 +200,16 @@ export const createBooking = async (req, res) => {
     const remainingBalance = price - advancePaid;
 
     let paymentStatus = "pending";
-    if (advancePaid > 0 && advancePaid < price) paymentStatus = "advance";
-    if (advancePaid >= price) paymentStatus = "full";
+    if (advancePaid > 0 && advancePaid < price) {
+      paymentStatus = "advance";
+    } else if (advancePaid >= price) {
+      paymentStatus = "full";
+    }
 
     // ---------------------------
     // ✅ CREATE BOOKING
     // ---------------------------
-    const booking = await Booking.create({
+    const booking = new Booking({
       trip: tripId,
       selectedPackage: selectedPackage || null,
       selectedRoomChoice: selectedRoomChoice || null,
@@ -235,27 +223,24 @@ export const createBooking = async (req, res) => {
       selectedDate,
       hasReview: false,
       reviewEnabled: false,
-      status: paymentStatus === "pending" ? "pending" : "confirmed",
+      status: "confirmed",
     });
 
-    // ---------------------------
-    // 📩 SEND EMAILS (WITH TRIP DATA)
-    // ---------------------------
+    await booking.save();
     if (!isadminBooking) {
-      const populatedBooking = await Booking.findById(booking._id).populate(
-        "trip"
-      );
+      const emailPromises = booking.passengers.map((passenger) => {
+        const htmlContent = generateBookingConfirmationHTML(
+          booking,
+          passenger,
+          trip,
+        );
 
-      const emailPromises = populatedBooking.passengers.map((passenger) =>
-        sendMail({
+        return sendMail({
           email: passenger.email,
           subject: "Booking Confirmation",
-          html: generateBookingConfirmationHTML(
-            populatedBooking,
-            passenger
-          ),
-        })
-      );
+          html: htmlContent,
+        });
+      });
 
       // Admin copy
       emailPromises.push(
@@ -263,10 +248,11 @@ export const createBooking = async (req, res) => {
           email: "sunshineholidaypackages@gmail.com",
           subject: "New Booking Confirmation",
           html: generateBookingConfirmationHTML(
-            populatedBooking,
-            populatedBooking.passengers[0]
+            booking,
+            booking.passengers[0], // primary passenger,
+            trip,
           ),
-        })
+        }),
       );
 
       await Promise.all(emailPromises);
@@ -283,7 +269,6 @@ export const createBooking = async (req, res) => {
     });
   }
 };
-
 
 // Update an existing booking
 export const updateBooking = async (req, res) => {
@@ -701,12 +686,10 @@ export const getTripBookingHistory = async (req, res) => {
     }
 
     if (!date || !/^\d{2}-\d{2}-\d{4}$/.test(date)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Valid date in DD-MM-YYYY format is required",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Valid date in DD-MM-YYYY format is required",
+      });
     }
 
     // Find all bookings for this trip on the exact selectedDate
@@ -1252,4 +1235,3 @@ export const getDayWiseBookings = async (req, res) => {
     });
   }
 };
-

@@ -134,7 +134,7 @@ export const contactHTML = ({ name, email, message }) => `
   </body>
 </html>`;
 
-export const generateBookingConfirmationHTML = (booking, passenger) => {
+export const generateBookingConfirmationHTML = (booking, passenger,trip) => {
   const formattedDate = new Date(booking.createdAt).toLocaleDateString("en-IN");
 
   const seatList = booking.selectedSeats
@@ -194,8 +194,9 @@ export const generateBookingConfirmationHTML = (booking, passenger) => {
         .toString()
         .slice(-6)
         .toUpperCase()}</p>
-      <p><strong>Trip Name:</strong> ${booking.trip?.title}</p>
-      <p><strong>Location:</strong> ${booking.trip?.location}</p>
+<p><strong>Trip Name:</strong> ${trip.title || "-"}</p>
+<p><strong>Location:</strong> ${trip.location || "N/A"}</p>
+
       <p><strong>Trip Date:</strong> ${booking.selectedDate}</p>
       <p><strong>Booking Date:</strong> ${formattedDate}</p>
       <p><strong>Seats:</strong> ${seatList}</p>
