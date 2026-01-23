@@ -31,7 +31,7 @@ router.get("/user", isAuthenticated, getAllBookingsByUserId);
 // ================= TRIP =================
 router.get("/trip/:tripId", getBookingsByTrip);
 router.get("/stats/:tripId", isAuthenticated, adminOnly, getTripBookingStats);
-router.get("/stats/trip-date/:tripId", isAuthenticated, getTripBookingStatsOfTrip);
+router.get("/stats/trip-date/:tripId", getTripBookingStatsOfTrip);
 router.get("/history/:id/:date", getTripBookingHistory);
 
 // ================= CRUD =================
