@@ -692,11 +692,11 @@ export const getTripBookingHistory = async (req, res) => {
       });
     }
 
-    // Find all bookings for this trip on the exact selectedDate
     const tripBookings = await Booking.find({
       trip: id,
       selectedDate: date,
-    }).populate("trip"); // Only populate trip, no user
+    }).populate("trip");
+
 
     if (!tripBookings || tripBookings.length === 0) {
       return res
@@ -704,41 +704,80 @@ export const getTripBookingHistory = async (req, res) => {
         .json({ success: false, message: "No bookings found for this date" });
     }
 
-    // Get trip details from the first booking (all share the same trip)
     const trip = tripBookings[0].trip;
+    console.log(trip);
 
-    // Find the matching startDate to get seat capacity
-    const matchingStartDate = trip.startDates.find((sd) => sd.date === date);
+    const matchingStartDate = (trip.startDates || []).find(
+      (sd) => sd.date === date
+    );
     const totalSeatsAvailable = matchingStartDate?.seats || 0;
 
-    // Calculate booked seats (only count numeric seats, ignore "N/A" or "block")
+    // ✅ correct seats count (seat is inside object)
     const bookedSeatsCount = tripBookings.reduce((total, booking) => {
-      return (
-        total +
-        booking.selectedSeats.filter(
-          (seat) => seat !== "N/A" && seat !== "block" && /^\d+$/.test(seat),
-        ).length
-      );
+      const seats = Array.isArray(booking.selectedSeats)
+        ? booking.selectedSeats
+        : [];
+
+      const numericSeats = seats.filter((s) => {
+        const seatStr = String(s?.seat ?? "").trim();
+        return seatStr !== "N/A" && seatStr !== "block" && /^\d+$/.test(seatStr);
+      }).length;
+
+      return total + numericSeats;
     }, 0);
 
-    // Construct purchase history (guest-friendly)
-    const purchaseHistory = tripBookings.map((booking) => ({
-      bookingId: booking._id,
-      leadPassenger: {
-        name: booking.passengers[0]?.name || "Guest",
-        phoneNumber: booking.passengers[0]?.phoneNumber || "N/A",
-      },
-      totalPassengers: booking.passengers.length,
-      selectedSeats: booking.selectedSeats,
-      price: booking.price,
-      advancePaid: booking.advancePaid,
-      remainingBalance: booking.remainingBalance,
-      paymentStatus: booking.paymentStatus,
-      status: booking.status,
-      hasReview: booking.hasReview,
-      reviewEnabled: booking.reviewEnabled,
-      createdAt: booking.createdAt,
-    }));
+    // ✅ passenger-wise history (flatten)
+    const passengerHistory = [];
+    for (const booking of tripBookings) {
+      const passengers = Array.isArray(booking.passengers)
+        ? booking.passengers
+        : [];
+
+      for (const p of passengers) {
+        passengerHistory.push({
+          bookingId: booking._id,
+
+          // Trip info
+          trip: {
+            tripId: trip._id,
+            tripName: trip.title || trip.location,
+            destination: trip.category || trip.location,
+            date: booking.selectedDate,
+          },
+
+          // Passenger info (full schema)
+          passenger: {
+            name: p.name,
+            phoneNumber: p.phoneNumber,
+            email: p.email,
+            age: p.age,
+            gender: p.gender,
+            idProof: p.idProof,
+            idProofNumber: p.idProofNumber,
+            address: p.address || "",
+          },
+
+          // Seats + booking info
+          selectedSeats: booking.selectedSeats,
+          selectedPackage: booking.selectedPackage,
+          selectedRoomChoice: booking.selectedRoomChoice,
+          roomCount: booking.roomCount,
+
+          // Payment info
+          price: booking.price,
+          advancePaid: booking.advancePaid,
+          remainingBalance: booking.remainingBalance,
+          paymentStatus: booking.paymentStatus,
+
+          // Status + review flags
+          status: booking.status,
+          hasReview: booking.hasReview,
+          reviewEnabled: booking.reviewEnabled,
+
+          createdAt: booking.createdAt,
+        });
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -746,19 +785,16 @@ export const getTripBookingHistory = async (req, res) => {
         tripId: trip._id,
         tripName: trip.name || trip.location,
         destination: trip.category || trip.location,
-        date: date,
+        date,
         totalSeatsAvailable,
         bookedSeatsCount,
         availableSeats: totalSeatsAvailable - bookedSeatsCount,
       },
       selectedDate: date,
       totalBookings: tripBookings.length,
-      totalPassengers: tripBookings.reduce(
-        (sum, b) => sum + b.passengers.length,
-        0,
-      ),
-      purchaseHistory,
-      message: `${tripBookings.length} booking(s) found for ${date}`,
+      totalPassengers: passengerHistory.length,
+      passengerHistory,
+      message: `${passengerHistory.length} passenger record(s) found for ${date}`,
     });
   } catch (error) {
     console.error("Error getting trip booking history:", error);
@@ -769,6 +805,7 @@ export const getTripBookingHistory = async (req, res) => {
     });
   }
 };
+
 
 export const getTripBookingStatsOfTrip = async (req, res) => {
   try {
