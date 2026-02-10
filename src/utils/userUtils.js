@@ -134,12 +134,21 @@ export const contactHTML = ({ name, email, message }) => `
   </body>
 </html>`;
 
-export const generateBookingConfirmationHTML = (booking, passenger,trip) => {
+export const generateBookingConfirmationHTML = (booking, passenger, trip, vehicles = []) => {
   const formattedDate = new Date(booking.createdAt).toLocaleDateString("en-IN");
 
+  // ✅ Seat + Vehicle details (from Trip.startDates.vehicles using busIndex)
   const seatList = booking.selectedSeats
-    .map((s) => `Seat ${s.seat} (Bus ${s.busIndex + 1})`)
-    .join(", ");
+    .map((s) => {
+      const busNo = s.busIndex + 1;
+      const v = vehicles[s.busIndex]; // ✅ busIndex mapping
+
+      const vehicleNo = v?.vehicleNumber || "N/A";
+      const instructor = v?.instructorName || "N/A";
+
+      return `Seat ${s.seat} (Bus ${busNo}) - Vehicle: ${vehicleNo}, Instructor: ${instructor}`;
+    })
+    .join("<br/>");
 
   return `
 <!DOCTYPE html>
@@ -147,37 +156,11 @@ export const generateBookingConfirmationHTML = (booking, passenger,trip) => {
 <head>
   <meta charset="UTF-8" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      padding: 10px;
-    }
-    .container {
-      max-width: 600px;
-      margin: auto;
-      background: #ffffff;
-      padding: 20px;
-      border-radius: 6px;
-    }
-    .header {
-      background: #4CAF50;
-      color: #ffffff;
-      padding: 15px;
-      text-align: center;
-      border-radius: 6px 6px 0 0;
-    }
-    .box {
-      border: 1px solid #ddd;
-      padding: 15px;
-      margin-top: 15px;
-      border-radius: 4px;
-    }
-    .footer {
-      font-size: 12px;
-      color: #666;
-      text-align: center;
-      margin-top: 20px;
-    }
+    body { font-family: Arial, sans-serif; background:#f4f4f4; padding:10px; }
+    .container { max-width: 600px; margin:auto; background:#fff; padding:20px; border-radius:6px; }
+    .header { background:#4CAF50; color:#fff; padding:15px; text-align:center; border-radius:6px 6px 0 0; }
+    .box { border:1px solid #ddd; padding:15px; margin-top:15px; border-radius:4px; }
+    .footer { font-size:12px; color:#666; text-align:center; margin-top:20px; }
   </style>
 </head>
 <body>
@@ -190,23 +173,20 @@ export const generateBookingConfirmationHTML = (booking, passenger,trip) => {
     <p>Your booking has been successfully confirmed. 🎉</p>
 
     <div class="box">
-      <p><strong>Booking ID:</strong> ${booking._id
-        .toString()
-        .slice(-6)
-        .toUpperCase()}</p>
-<p><strong>Trip Name:</strong> ${trip.title || "-"}</p>
-<p><strong>Location:</strong> ${trip.location || "N/A"}</p>
-
+      <p><strong>Booking ID:</strong> ${booking._id.toString().slice(-6).toUpperCase()}</p>
+      <p><strong>Trip Name:</strong> ${trip.title || "-"}</p>
+      <p><strong>Location:</strong> ${trip.location || "N/A"}</p>
       <p><strong>Trip Date:</strong> ${booking.selectedDate}</p>
       <p><strong>Booking Date:</strong> ${formattedDate}</p>
-      <p><strong>Seats:</strong> ${seatList}</p>
+
+      <p><strong>Seats + Bus + Vehicle Details:</strong><br/>${seatList}</p>
     </div>
 
     <div class="box">
       <p><strong>Total Price:</strong> ₹${booking.price}</p>
       <p><strong>Advance Paid:</strong> ₹${booking.advancePaid}</p>
       <p><strong>Remaining Balance:</strong> ₹${booking.remainingBalance}</p>
-      <p><strong>Payment Status:</strong> ${booking.paymentStatus.toUpperCase()}</p>
+      <p><strong>Payment Status:</strong> ${String(booking.paymentStatus).toUpperCase()}</p>
     </div>
 
     <div class="box">
@@ -219,16 +199,14 @@ export const generateBookingConfirmationHTML = (booking, passenger,trip) => {
     <p>Please arrive at least <strong>30 minutes early</strong> with a valid ID proof.</p>
 
     <div class="footer">
-      <p>
-        Sunshine Holiday Packages<br />
-        📧 sunshineholidaypackages@gmail.com
-      </p>
+      <p>Sunshine Holiday Packages<br/>📧 sunshineholidaypackages@gmail.com</p>
     </div>
   </div>
 </body>
 </html>
 `;
 };
+
 
 
 

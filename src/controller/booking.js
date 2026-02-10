@@ -40,6 +40,8 @@ const checkRequiredFields = (fields, res) => {
 
 // Create a new booking
 
+
+
 export const createBooking = async (req, res) => {
   try {
     const {
@@ -49,9 +51,9 @@ export const createBooking = async (req, res) => {
       roomCount = 0,
       price,
       advancePaid = 0,
-      selectedDate,
+      selectedDate, // must be "DD-MM-YYYY"
       passengers,
-      selectedSeats,
+      selectedSeats, // [{seat:"3", busIndex:0}, ...]
       isadminBooking = false,
     } = req.body;
 
@@ -60,10 +62,12 @@ export const createBooking = async (req, res) => {
     // ---------------------------
     if (
       !tripId ||
-      !price ||
+      price == null ||
       !selectedDate ||
       !Array.isArray(passengers) ||
-      !Array.isArray(selectedSeats)
+      passengers.length === 0 ||
+      !Array.isArray(selectedSeats) ||
+      selectedSeats.length === 0
     ) {
       return res.status(400).json({
         message: "Missing required booking fields",
@@ -81,6 +85,29 @@ export const createBooking = async (req, res) => {
     if (!trip) {
       return res.status(404).json({ message: "Trip not found" });
     }
+
+    // ---------------------------
+    // 📅 DATE FORMAT VALIDATION
+    // ---------------------------
+    if (!/^\d{2}-\d{2}-\d{4}$/.test(String(selectedDate))) {
+      return res.status(400).json({
+        message: "Selected date must be DD-MM-YYYY",
+      });
+    }
+
+    // ---------------------------
+    // ✅ FIND START DATE + VEHICLES FOR THIS DATE
+    // ---------------------------
+    const startDateObj =
+      trip.startDates?.find((sd) => String(sd?.date).trim() === String(selectedDate).trim()) ||
+      null;
+
+    const vehicles = startDateObj?.vehicles || [];
+
+    // (Optional) If you want to ensure buses exist when using multi-bus seats:
+    // if (!startDateObj) {
+    //   return res.status(400).json({ message: "Selected date not available for this trip" });
+    // }
 
     // ---------------------------
     // 📦 PACKAGE / ROOM VALIDATION
@@ -114,12 +141,13 @@ export const createBooking = async (req, res) => {
     // ---------------------------
     const validPassengers = passengers.every(
       (p) =>
-        p.name &&
-        p.age &&
-        ["male", "female", "other"].includes(p.gender) &&
-        ["aadhar", "pan"].includes(p.idProof) &&
-        p.idProofNumber &&
-        p.phoneNumber,
+        p?.name &&
+        p?.age &&
+        ["male", "female", "other"].includes(p?.gender) &&
+        ["aadhar", "pan"].includes(p?.idProof) &&
+        p?.idProofNumber &&
+        p?.phoneNumber &&
+        p?.email
     );
 
     if (!validPassengers) {
@@ -131,28 +159,36 @@ export const createBooking = async (req, res) => {
     // ---------------------------
     // 🪑 SEAT VALIDATION (MULTI BUS)
     // ---------------------------
-    if (selectedSeats.length === 0) {
-      return res.status(400).json({
-        message: "At least one seat is required",
-      });
-    }
-
     const seatsAreValid = selectedSeats.every(
       (s) =>
         typeof s === "object" &&
         typeof s.seat === "string" &&
+        s.seat.trim() !== "" &&
         typeof s.busIndex === "number" &&
-        s.busIndex >= 0,
+        Number.isFinite(s.busIndex) &&
+        s.busIndex >= 0
     );
 
     if (!seatsAreValid) {
       return res.status(400).json({
-        message: "Each seat must contain seat and busIndex",
+        message: "Each seat must contain seat (string) and busIndex (number >= 0)",
       });
     }
 
+    // ✅ if trip has vehicles list for this date, validate busIndex within range
+    if (vehicles.length > 0) {
+      const maxBusIndex = vehicles.length - 1;
+      const busIndexOk = selectedSeats.every((s) => s.busIndex <= maxBusIndex);
+      if (!busIndexOk) {
+        return res.status(400).json({
+          message: `Invalid busIndex. Max allowed busIndex is ${maxBusIndex}.`,
+        });
+      }
+    }
+
     // ---------------------------
-    // 🔒 OPTIONAL: PREVENT DOUBLE BOOKING
+    // 🔒 PREVENT DOUBLE BOOKING
+    // (checks any overlap seat+busIndex for same trip+date)
     // ---------------------------
     const seatConflicts = await Booking.findOne({
       trip: tripId,
@@ -174,37 +210,32 @@ export const createBooking = async (req, res) => {
     }
 
     // ---------------------------
-    // 📅 DATE FORMAT VALIDATION
-    // ---------------------------
-    if (!/^\d{2}-\d{2}-\d{4}$/.test(selectedDate)) {
-      return res.status(400).json({
-        message: "Selected date must be DD-MM-YYYY",
-      });
-    }
-
-    // ---------------------------
     // 💰 PAYMENT VALIDATION
     // ---------------------------
-    if (price < 0 || advancePaid < 0) {
+    const totalPrice = Number(price);
+    const adv = Number(advancePaid);
+
+    if (!Number.isFinite(totalPrice) || !Number.isFinite(adv)) {
+      return res.status(400).json({ message: "Invalid price values" });
+    }
+
+    if (totalPrice < 0 || adv < 0) {
       return res.status(400).json({
         message: "Price values cannot be negative",
       });
     }
 
-    if (advancePaid > price) {
+    if (adv > totalPrice) {
       return res.status(400).json({
         message: "Advance paid cannot exceed total price",
       });
     }
 
-    const remainingBalance = price - advancePaid;
+    const remainingBalance = totalPrice - adv;
 
     let paymentStatus = "pending";
-    if (advancePaid > 0 && advancePaid < price) {
-      paymentStatus = "advance";
-    } else if (advancePaid >= price) {
-      paymentStatus = "full";
-    }
+    if (adv > 0 && adv < totalPrice) paymentStatus = "advance";
+    if (adv >= totalPrice) paymentStatus = "full";
 
     // ---------------------------
     // ✅ CREATE BOOKING
@@ -214,8 +245,8 @@ export const createBooking = async (req, res) => {
       selectedPackage: selectedPackage || null,
       selectedRoomChoice: selectedRoomChoice || null,
       roomCount,
-      price,
-      advancePaid,
+      price: totalPrice,
+      advancePaid: adv,
       remainingBalance,
       paymentStatus,
       passengers,
@@ -227,12 +258,17 @@ export const createBooking = async (req, res) => {
     });
 
     await booking.save();
+
+    // ---------------------------
+    // ✉️ EMAILS (include vehicles so invoice shows bus+vehicle+instructor)
+    // ---------------------------
     if (!isadminBooking) {
       const emailPromises = booking.passengers.map((passenger) => {
         const htmlContent = generateBookingConfirmationHTML(
           booking,
           passenger,
           trip,
+          vehicles // ✅ PASS VEHICLES
         );
 
         return sendMail({
@@ -249,10 +285,11 @@ export const createBooking = async (req, res) => {
           subject: "New Booking Confirmation",
           html: generateBookingConfirmationHTML(
             booking,
-            booking.passengers[0], // primary passenger,
+            booking.passengers[0],
             trip,
+            vehicles // ✅ PASS VEHICLES
           ),
-        }),
+        })
       );
 
       await Promise.all(emailPromises);
@@ -261,6 +298,10 @@ export const createBooking = async (req, res) => {
     return res.status(201).json({
       message: "Booking created successfully",
       booking,
+      meta: {
+        selectedDateFound: Boolean(startDateObj),
+        vehiclesCount: vehicles.length,
+      },
     });
   } catch (error) {
     console.error("Create booking error:", error);
@@ -269,6 +310,7 @@ export const createBooking = async (req, res) => {
     });
   }
 };
+
 
 // Update an existing booking
 export const updateBooking = async (req, res) => {
