@@ -145,8 +145,8 @@ export const generateBookingConfirmationHTML = (booking, passenger, trip, vehicl
 
       const vehicleNo = v?.vehicleNumber || "N/A";
       const instructor = v?.instructorName || "N/A";
-
-      return `Seat ${s.seat} (Bus ${busNo}) - Vehicle: ${vehicleNo}, Instructor: ${instructor}`;
+const instructorPhone = v?.phoneNumber || "N/A";
+      return `Seat ${s.seat} (Bus ${busNo}) - Vehicle: ${vehicleNo}, Instructor: ${instructor}, Phone: ${instructorPhone}`;
     })
     .join("<br/>");
 

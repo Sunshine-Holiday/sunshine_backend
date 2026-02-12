@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 const vehicleSchema = new mongoose.Schema({
   instructorName: { type: String, required: true },
   vehicleNumber: { type: String, required: true },
+  phoneNumber: { type: String, required: true },
 });
 
 // Boarding Point Schema
