@@ -19,7 +19,11 @@ const boardingPointSchema = new mongoose.Schema({
 const startDateSchema = new mongoose.Schema({
   date: { type: String },
   numberOfBusesAvailable: { type: String },
-
+  minSeatsPerBooking: {
+    type: Number,
+    default: 1,
+    min: 1,
+  },
   seats: {
     type: Number,
     validate: {
