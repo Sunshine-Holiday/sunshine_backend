@@ -11,6 +11,17 @@ const seatSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    /**
+     * Interconnected stay packages book two legs:
+     * - going: outbound (e.g. Sat bus)
+     * - coming: return (e.g. Sun bus)
+     * Day trips use "single".
+     */
+    leg: {
+      type: String,
+      enum: ["single", "going", "coming"],
+      default: "single",
+    },
   },
   { _id: false }
 );

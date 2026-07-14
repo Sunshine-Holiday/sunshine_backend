@@ -106,6 +106,40 @@ const tripSchema = new mongoose.Schema({
     min: 0,
     index: true,
   },
+  /**
+   * Interconnected trips (e.g. Mahabaleshwar Sat / Sun / 2D1N share buses).
+   * - outbound: going day-trip (e.g. Every Saturday)
+   * - return: coming day-trip (e.g. Every Sunday)
+   * - stay: multi-day package that uses outbound seats for going + return seats for coming
+   */
+  interconnection: {
+    enabled: { type: Boolean, default: false },
+    role: {
+      type: String,
+      enum: ["none", "outbound", "return", "stay"],
+      default: "none",
+    },
+    /** Stay package: day-trip used for going seat map */
+    outboundTrip: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Trip",
+      default: null,
+    },
+    /** Stay package: day-trip used for coming/return seat map */
+    returnTrip: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Trip",
+      default: null,
+    },
+    /** Day trips: linked stay package that also occupies their seats */
+    stayTrip: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Trip",
+      default: null,
+    },
+    /** Days between going date and return date (1 for 2D1N) */
+    dayOffset: { type: Number, default: 1, min: 1 },
+  },
 });
 
 export default mongoose.model("Trip", tripSchema);

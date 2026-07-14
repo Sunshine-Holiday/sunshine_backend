@@ -189,24 +189,50 @@ export const createBooking = async (req, res) => {
 
     // ---------------------------
     // 🔒 PREVENT DOUBLE BOOKING
-    // (checks any overlap seat+busIndex for same trip+date)
+    // (same trip + interconnected linked trips: Sat/Sun/2D1N)
     // ---------------------------
-    const seatConflicts = await Booking.findOne({
-      trip: tripId,
-      selectedDate,
-      selectedSeats: {
-        $elemMatch: {
-          $or: selectedSeats.map((s) => ({
-            seat: s.seat,
-            busIndex: s.busIndex,
-          })),
-        },
-      },
-    });
+    // Normalize legs on seats
+    const normalizedSeats = selectedSeats.map((s) => ({
+      seat: String(s.seat).trim(),
+      busIndex: Number(s.busIndex),
+      leg: ["going", "coming", "single"].includes(s.leg) ? s.leg : "single",
+    }));
 
-    if (seatConflicts) {
+    // Stay interconnected bookings must provide both going + coming seats
+    const ic = trip.interconnection || {};
+    if (ic.enabled && ic.role === "stay") {
+      const goingCount = normalizedSeats.filter((s) => s.leg === "going").length;
+      const comingCount = normalizedSeats.filter(
+        (s) => s.leg === "coming"
+      ).length;
+      if (goingCount === 0 || comingCount === 0) {
+        return res.status(400).json({
+          message:
+            "Stay package requires seats for both Going and Coming legs",
+        });
+      }
+      if (goingCount !== comingCount) {
+        return res.status(400).json({
+          message:
+            "Number of Going seats must match number of Coming seats",
+        });
+      }
+    }
+
+    const {
+      hasInterconnectedSeatConflict,
+    } = await import("../utils/interconnection.js");
+
+    const icConflict = await hasInterconnectedSeatConflict(
+      trip,
+      selectedDate,
+      normalizedSeats
+    );
+    if (icConflict.conflict) {
       return res.status(400).json({
-        message: "One or more selected seats are already booked",
+        message:
+          icConflict.message ||
+          "One or more selected seats are already booked on linked trips",
       });
     }
 
@@ -261,7 +287,7 @@ export const createBooking = async (req, res) => {
       remainingBalance,
       paymentStatus,
       passengers,
-      selectedSeats,
+      selectedSeats: normalizedSeats,
       selectedDate,
       hasReview: false,
       reviewEnabled: false,
@@ -887,7 +913,8 @@ export const getTripBookingHistory = async (req, res) => {
 export const getTripBookingStatsOfTrip = async (req, res) => {
   try {
     const { tripId } = req.params;
-    const { selectedDate: querySelectedDate } = req.query;
+    // leg: single | going | coming — used for interconnected stay dual maps
+    const { selectedDate: querySelectedDate, leg: queryLeg } = req.query;
 
     if (!tripId || !mongoose.Types.ObjectId.isValid(tripId)) {
       return res.status(400).json({
@@ -896,64 +923,63 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
       });
     }
 
+    if (querySelectedDate && !/^\d{2}-\d{2}-\d{4}$/.test(querySelectedDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date format. Use DD-MM-YYYY",
+      });
+    }
+
+    const trip = await Trip.findById(tripId);
+    if (!trip) {
+      return res.status(404).json({
+        success: false,
+        message: "Trip not found",
+      });
+    }
+
     const filter = { trip: tripId };
+    if (querySelectedDate) filter.selectedDate = querySelectedDate;
 
+    const bookings = await Booking.find(filter);
+
+    /* ---------------------------------- */
+    /* 🚌 INTERCONNECTED OCCUPIED SEATS   */
+    /* ---------------------------------- */
+    const mapLeg = ["going", "coming", "single"].includes(queryLeg)
+      ? queryLeg
+      : "single";
+
+    let selectedSeatsByBus = {};
     if (querySelectedDate) {
-      if (!/^\d{2}-\d{2}-\d{4}$/.test(querySelectedDate)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid date format. Use DD-MM-YYYY",
-        });
-      }
-      filter.selectedDate = querySelectedDate;
-    }
-
-    const bookings = await Booking.find(filter).populate("trip");
-
-    if (!bookings.length) {
-      return res.status(200).json({
-        success: true,
-        stats: {
-          totalBookings: 0,
-          totalPassengers: 0,
-          totalSeatsBooked: 0,
-          availableSeats: 0,
-          totalAvailableSeats: 0,
-          uniqueCustomers: 0,
-        },
-        selectedSeatsByBus: {},
-        message: "No bookings found",
-      });
-    }
-
-    /* ---------------------------------- */
-    /* 🚌 CORRECT BUS-AWARE SEAT PARSING   */
-    /* ---------------------------------- */
-
-    const selectedSeatsByBus = {}; // { busIndex: [seatNo] }
-    let totalSeatsBooked = 0;
-
-    bookings.forEach((booking) => {
-      booking.selectedSeats.forEach((seatObj) => {
-        // Ignore N/A seats
-        if (!seatObj || seatObj.seat === "N/A") return;
-
-        const { seat, busIndex } = seatObj;
-
-        if (typeof seat === "string" && typeof busIndex === "number") {
-          if (!selectedSeatsByBus[busIndex]) {
-            selectedSeatsByBus[busIndex] = [];
+      const {
+        getInterconnectedOccupiedSeats,
+      } = await import("../utils/interconnection.js");
+      selectedSeatsByBus = await getInterconnectedOccupiedSeats(
+        trip,
+        querySelectedDate,
+        mapLeg
+      );
+    } else {
+      // No date: only this trip's seats (legacy)
+      bookings.forEach((booking) => {
+        (booking.selectedSeats || []).forEach((seatObj) => {
+          if (!seatObj || seatObj.seat === "N/A") return;
+          const { seat, busIndex } = seatObj;
+          if (typeof seat === "string" && typeof busIndex === "number") {
+            if (!selectedSeatsByBus[busIndex]) selectedSeatsByBus[busIndex] = [];
+            if (!selectedSeatsByBus[busIndex].includes(seat)) {
+              selectedSeatsByBus[busIndex].push(seat);
+            }
           }
-
-          selectedSeatsByBus[busIndex].push(seat);
-          totalSeatsBooked++;
-        }
+        });
       });
-    });
+    }
 
-    /* ---------------------------------- */
-    /* 📊 OTHER STATS                     */
-    /* ---------------------------------- */
+    let totalSeatsBooked = 0;
+    Object.values(selectedSeatsByBus).forEach((arr) => {
+      totalSeatsBooked += Array.isArray(arr) ? arr.length : 0;
+    });
 
     const totalPassengers = bookings.reduce(
       (sum, b) => sum + (b.passengers?.length || 0),
@@ -964,30 +990,62 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
       bookings.map((b) => b.passengers?.[0]?.phoneNumber).filter(Boolean),
     ).size;
 
-    /* ---------------------------------- */
-    /* 🧮 TOTAL CAPACITY                  */
-    /* ---------------------------------- */
-
     let seatsPerBus = 0;
     let numberOfBusesAvailable = 1;
 
-    const trip = bookings[0].trip;
+    // For stay going/coming maps, capacity comes from linked day-trip
+    let capacityTrip = trip;
+    const ic = trip.interconnection || {};
+    if (ic.enabled && ic.role === "stay") {
+      if (mapLeg === "going" && ic.outboundTrip) {
+        capacityTrip = (await Trip.findById(ic.outboundTrip)) || trip;
+      } else if (mapLeg === "coming" && ic.returnTrip) {
+        capacityTrip = (await Trip.findById(ic.returnTrip)) || trip;
+      }
+    }
 
-    if (trip?.startDates && querySelectedDate) {
-      const matchingDate = trip.startDates.find(
-        (sd) => sd.date === querySelectedDate,
+    let capacityDate = querySelectedDate;
+    if (
+      ic.enabled &&
+      ic.role === "stay" &&
+      mapLeg === "coming" &&
+      querySelectedDate
+    ) {
+      const { addDaysToDateStr } = await import("../utils/interconnection.js");
+      capacityDate = addDaysToDateStr(
+        querySelectedDate,
+        Math.max(1, Number(ic.dayOffset) || 1)
       );
+    }
 
-      if (matchingDate) {
-        seatsPerBus = Number(matchingDate.seats || 0);
-        numberOfBusesAvailable = Number(
-          matchingDate.numberOfBusesAvailable || 1,
-        );
+    if (capacityTrip?.startDates && capacityDate) {
+      const matchingDate = capacityTrip.startDates.find(
+        (sd) => sd.date === capacityDate
+      );
+      // For stay going map, use stay start date on outbound trip
+      const matchingGoing =
+        !matchingDate && mapLeg === "going" && querySelectedDate
+          ? capacityTrip.startDates.find((sd) => sd.date === querySelectedDate)
+          : matchingDate;
+
+      const md = matchingGoing || matchingDate;
+      if (md) {
+        seatsPerBus = Number(md.seats || 0);
+        numberOfBusesAvailable = Number(md.numberOfBusesAvailable || 1);
+      }
+    }
+
+    // Fallback: this trip's date
+    if (!seatsPerBus && trip?.startDates && querySelectedDate) {
+      const md = trip.startDates.find((sd) => sd.date === querySelectedDate);
+      if (md) {
+        seatsPerBus = Number(md.seats || 0);
+        numberOfBusesAvailable = Number(md.numberOfBusesAvailable || 1);
       }
     }
 
     const totalAvailableSeats = seatsPerBus * numberOfBusesAvailable;
-    const availableSeats = totalAvailableSeats - totalSeatsBooked;
+    const availableSeats = Math.max(0, totalAvailableSeats - totalSeatsBooked);
 
     return res.status(200).json({
       success: true,
@@ -1003,6 +1061,10 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
       },
       selectedSeatsByBus,
       selectedDate: querySelectedDate,
+      leg: mapLeg,
+      interconnection: ic.enabled
+        ? { enabled: true, role: ic.role, dayOffset: ic.dayOffset }
+        : { enabled: false },
       message: "Seat stats fetched successfully",
     });
   } catch (error) {

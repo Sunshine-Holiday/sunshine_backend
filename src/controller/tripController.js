@@ -212,6 +212,12 @@ export const createTrip = async (req, res) => {
     if (description) tripData.description = description;
     if (parsedStartDates.length > 0) tripData.startDates = parsedStartDates;
     if (category) tripData.category = category;
+
+    // Interconnected trips (Sat / Sun / 2D1N seat sharing)
+    const { parseInterconnectionBody } = await import(
+      "../utils/interconnection.js"
+    );
+    tripData.interconnection = parseInterconnectionBody(req.body);
     if (parsedAmenities.length > 0) tripData.amenities = parsedAmenities;
     if (parsedBoardingPoints.length > 0) tripData.boardingPoints = parsedBoardingPoints;
     if (parsedPackages.length > 0) tripData.packages = parsedPackages;
@@ -280,6 +286,37 @@ export const createTrip = async (req, res) => {
 
     const trip = new Trip(tripData);
     const savedTrip = await trip.save();
+
+    // Keep day-trips pointing back at this stay package for shared seat maps
+    if (
+      savedTrip.interconnection?.enabled &&
+      savedTrip.interconnection.role === "stay"
+    ) {
+      const stayId = savedTrip._id;
+      const { outboundTrip, returnTrip, dayOffset } =
+        savedTrip.interconnection;
+      if (outboundTrip) {
+        await Trip.findByIdAndUpdate(outboundTrip, {
+          $set: {
+            "interconnection.enabled": true,
+            "interconnection.role": "outbound",
+            "interconnection.stayTrip": stayId,
+            "interconnection.dayOffset": dayOffset || 1,
+          },
+        });
+      }
+      if (returnTrip) {
+        await Trip.findByIdAndUpdate(returnTrip, {
+          $set: {
+            "interconnection.enabled": true,
+            "interconnection.role": "return",
+            "interconnection.stayTrip": stayId,
+            "interconnection.dayOffset": dayOffset || 1,
+          },
+        });
+      }
+    }
+
     res.status(201).json(savedTrip);
   } catch (error) {
     console.error("Error creating trip:", error);
@@ -397,7 +434,12 @@ export const getTripById = async (req, res) => {
       .populate("user") // optionally populate user details
       .populate("booking", "bookingNumber"); // optionally populate booking info
 
-    res.status(200).json({ trip, reviews });
+    const { populateInterconnection } = await import(
+      "../utils/interconnection.js"
+    );
+    const tripOut = await populateInterconnection(trip);
+
+    res.status(200).json({ trip: tripOut, reviews });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -667,6 +709,14 @@ export const updateTrip = async (req, res) => {
     if (brochureFile !== undefined)
       updateData.brochureFile = String(brochureFile || "");
 
+    // Interconnected trips config
+    if (req.body.interconnection !== undefined) {
+      const { parseInterconnectionBody } = await import(
+        "../utils/interconnection.js"
+      );
+      updateData.interconnection = parseInterconnectionBody(req.body);
+    }
+
     // ---------------------------
     // 🚀 UPDATE DB
     // ---------------------------
@@ -678,6 +728,35 @@ export const updateTrip = async (req, res) => {
 
     if (!updatedTrip) {
       return res.status(404).json({ message: "Trip not found" });
+    }
+
+    if (
+      updatedTrip.interconnection?.enabled &&
+      updatedTrip.interconnection.role === "stay"
+    ) {
+      const stayId = updatedTrip._id;
+      const { outboundTrip, returnTrip, dayOffset } =
+        updatedTrip.interconnection;
+      if (outboundTrip) {
+        await Trip.findByIdAndUpdate(outboundTrip, {
+          $set: {
+            "interconnection.enabled": true,
+            "interconnection.role": "outbound",
+            "interconnection.stayTrip": stayId,
+            "interconnection.dayOffset": dayOffset || 1,
+          },
+        });
+      }
+      if (returnTrip) {
+        await Trip.findByIdAndUpdate(returnTrip, {
+          $set: {
+            "interconnection.enabled": true,
+            "interconnection.role": "return",
+            "interconnection.stayTrip": stayId,
+            "interconnection.dayOffset": dayOffset || 1,
+          },
+        });
+      }
     }
 
     res.status(200).json(updatedTrip);
