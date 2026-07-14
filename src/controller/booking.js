@@ -55,6 +55,7 @@ export const createBooking = async (req, res) => {
       passengers,
       selectedSeats, // [{seat:"3", busIndex:0}, ...]
       isadminBooking = false,
+      blockReason = "",
     } = req.body;
 
     // ---------------------------
@@ -240,6 +241,16 @@ export const createBooking = async (req, res) => {
     // ---------------------------
     // ✅ CREATE BOOKING
     // ---------------------------
+    const adminBlock = Boolean(isadminBooking);
+    const reason = String(blockReason || "").trim();
+
+    // Admin seat blocks must include a reason for other admins
+    if (adminBlock && !reason) {
+      return res.status(400).json({
+        message: "Please add a reason for blocking the seat(s)",
+      });
+    }
+
     const booking = new Booking({
       trip: tripId,
       selectedPackage: selectedPackage || null,
@@ -255,6 +266,8 @@ export const createBooking = async (req, res) => {
       hasReview: false,
       reviewEnabled: false,
       status: "confirmed",
+      isAdminBooking: adminBlock,
+      blockReason: adminBlock ? reason : "",
     });
 
     await booking.save();
@@ -262,7 +275,7 @@ export const createBooking = async (req, res) => {
     // ---------------------------
     // ✉️ EMAILS (include vehicles so invoice shows bus+vehicle+instructor)
     // ---------------------------
-    if (!isadminBooking) {
+    if (!adminBlock) {
       const emailPromises = booking.passengers.map((passenger) => {
         const htmlContent = generateBookingConfirmationHTML(
           booking,
@@ -769,13 +782,21 @@ export const getTripBookingHistory = async (req, res) => {
     }, 0);
 
     // ✅ passenger-wise history (flatten)
+    // passengers[i] is paired with selectedSeats[i] (same order at booking time)
     const passengerHistory = [];
     for (const booking of tripBookings) {
       const passengers = Array.isArray(booking.passengers)
         ? booking.passengers
         : [];
+      const seats = Array.isArray(booking.selectedSeats)
+        ? booking.selectedSeats
+        : [];
 
-      for (const p of passengers) {
+      for (let i = 0; i < passengers.length; i++) {
+        const p = passengers[i];
+        // Individual seat booked by this passenger (index-aligned)
+        const assignedSeat = seats[i] || null;
+
         passengerHistory.push({
           bookingId: booking._id,
 
@@ -799,8 +820,18 @@ export const getTripBookingHistory = async (req, res) => {
             address: p.address || "",
           },
 
-          // Seats + booking info
-          selectedSeats: booking.selectedSeats,
+          // Individual seat for THIS passenger
+          seat: assignedSeat
+            ? {
+                seat: String(assignedSeat.seat ?? ""),
+                busIndex: Number(assignedSeat.busIndex ?? 0),
+              }
+            : null,
+          seatNumber: assignedSeat ? String(assignedSeat.seat ?? "") : "",
+          busIndex: assignedSeat != null ? Number(assignedSeat.busIndex ?? 0) : null,
+
+          // Full seats list (compat for UI) + booking info
+          selectedSeats: seats,
           selectedPackage: booking.selectedPackage,
           selectedRoomChoice: booking.selectedRoomChoice,
           roomCount: booking.roomCount,
@@ -815,6 +846,10 @@ export const getTripBookingHistory = async (req, res) => {
           status: booking.status,
           hasReview: booking.hasReview,
           reviewEnabled: booking.reviewEnabled,
+
+          // Admin block note (why seats were blocked)
+          isAdminBooking: Boolean(booking.isAdminBooking),
+          blockReason: booking.blockReason || "",
 
           createdAt: booking.createdAt,
         });

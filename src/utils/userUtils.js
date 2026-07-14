@@ -134,21 +134,115 @@ export const contactHTML = ({ name, email, message }) => `
   </body>
 </html>`;
 
+/**
+ * Resolve the passenger's selected pickup / boarding point from the trip
+ * and return a Google Maps link (stored maplink or search fallback).
+ */
+export const resolvePickupMapInfo = (passenger, trip) => {
+  const address = String(passenger?.address || "").trim();
+  const points = Array.isArray(trip?.boardingPoints) ? trip.boardingPoints : [];
+
+  if (!address && points.length === 0) {
+    return { location: "", time: "", details: "", mapUrl: "" };
+  }
+
+  let point =
+    points.find((p) => String(p?.location || "").trim() === address) || null;
+
+  // UI may show "Location - time" but store only location; also try prefix match
+  if (!point && address) {
+    point =
+      points.find((p) => {
+        const loc = String(p?.location || "").trim();
+        return (
+          address.startsWith(loc) ||
+          address.includes(loc) ||
+          loc.includes(address)
+        );
+      }) || null;
+  }
+
+  // Fallback: first boarding point if passenger has no address but trip has points
+  if (!point && points.length === 1) {
+    point = points[0];
+  }
+
+  const location = point?.location || address || "";
+  const time = point?.time || "";
+  const details = point?.details || "";
+  let mapUrl = String(point?.maplink || "").trim();
+
+  if (!mapUrl && location) {
+    mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+      location
+    )}`;
+  }
+
+  return { location, time, details, mapUrl };
+};
+
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
 export const generateBookingConfirmationHTML = (booking, passenger, trip, vehicles = []) => {
   const formattedDate = new Date(booking.createdAt).toLocaleDateString("en-IN");
 
   // ✅ Seat + Vehicle details (from Trip.startDates.vehicles using busIndex)
-  const seatList = booking.selectedSeats
+  const seatList = (booking.selectedSeats || [])
     .map((s) => {
-      const busNo = s.busIndex + 1;
+      const busNo = Number(s.busIndex) + 1;
       const v = vehicles[s.busIndex]; // ✅ busIndex mapping
 
       const vehicleNo = v?.vehicleNumber || "N/A";
       const instructor = v?.instructorName || "N/A";
-const instructorPhone = v?.phoneNumber || "N/A";
+      const instructorPhone = v?.phoneNumber || "N/A";
       return `Seat ${s.seat} (Bus ${busNo}) - Vehicle: ${vehicleNo}, Instructor: ${instructor}, Phone: ${instructorPhone}`;
     })
     .join("<br/>");
+
+  // All passengers' pickup points (admin email benefits from full list)
+  const passengers = Array.isArray(booking.passengers) ? booking.passengers : [passenger];
+  const pickupRows = passengers
+    .map((p) => {
+      const info = resolvePickupMapInfo(p, trip);
+      if (!info.location && !info.mapUrl) return "";
+      const mapLinkHtml = info.mapUrl
+        ? `<a href="${escapeHtml(info.mapUrl)}" target="_blank" rel="noopener noreferrer" style="color:#ea580c;font-weight:bold;text-decoration:underline;">Open Google Maps →</a>`
+        : "N/A";
+      return `
+        <tr>
+          <td style="padding:8px;border:1px solid #eee;vertical-align:top;">
+            <strong>${escapeHtml(p?.name || "Passenger")}</strong>
+          </td>
+          <td style="padding:8px;border:1px solid #eee;vertical-align:top;">
+            ${escapeHtml(info.location || "—")}${info.time ? ` <span style="color:#666;">(${escapeHtml(info.time)})</span>` : ""}
+            ${info.details ? `<br/><span style="color:#666;font-size:12px;">${escapeHtml(info.details)}</span>` : ""}
+          </td>
+          <td style="padding:8px;border:1px solid #eee;vertical-align:top;">
+            ${mapLinkHtml}
+          </td>
+        </tr>`;
+    })
+    .filter(Boolean)
+    .join("");
+
+  // Primary passenger pickup (for user-facing copy)
+  const primaryPickup = resolvePickupMapInfo(passenger, trip);
+  const primaryMapBtn = primaryPickup.mapUrl
+    ? `<p style="margin:12px 0 0;">
+        <a href="${escapeHtml(primaryPickup.mapUrl)}" target="_blank" rel="noopener noreferrer"
+           style="display:inline-block;background:#ea580c;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;">
+          📍 Open Pickup on Google Maps
+        </a>
+      </p>
+      <p style="font-size:12px;color:#666;word-break:break-all;margin:8px 0 0;">
+        ${escapeHtml(primaryPickup.mapUrl)}
+      </p>`
+    : "";
 
   return `
 <!DOCTYPE html>
@@ -161,6 +255,7 @@ const instructorPhone = v?.phoneNumber || "N/A";
     .header { background:#4CAF50; color:#fff; padding:15px; text-align:center; border-radius:6px 6px 0 0; }
     .box { border:1px solid #ddd; padding:15px; margin-top:15px; border-radius:4px; }
     .footer { font-size:12px; color:#666; text-align:center; margin-top:20px; }
+    .pickup-box { border:1px solid #fdba74; background:#fff7ed; padding:15px; margin-top:15px; border-radius:4px; }
   </style>
 </head>
 <body>
@@ -169,17 +264,41 @@ const instructorPhone = v?.phoneNumber || "N/A";
       <h2>Booking Confirmation</h2>
     </div>
 
-    <p>Hello <strong>${passenger.name}</strong>,</p>
+    <p>Hello <strong>${escapeHtml(passenger.name)}</strong>,</p>
     <p>Your booking has been successfully confirmed. 🎉</p>
 
     <div class="box">
       <p><strong>Booking ID:</strong> ${booking._id.toString().slice(-6).toUpperCase()}</p>
-      <p><strong>Trip Name:</strong> ${trip.title || "-"}</p>
-      <p><strong>Location:</strong> ${trip.location || "N/A"}</p>
-      <p><strong>Trip Date:</strong> ${booking.selectedDate}</p>
+      <p><strong>Trip Name:</strong> ${escapeHtml(trip.title || "-")}</p>
+      <p><strong>Location:</strong> ${escapeHtml(trip.location || "N/A")}</p>
+      <p><strong>Trip Date:</strong> ${escapeHtml(booking.selectedDate)}</p>
       <p><strong>Booking Date:</strong> ${formattedDate}</p>
 
       <p><strong>Seats + Bus + Vehicle Details:</strong><br/>${seatList}</p>
+    </div>
+
+    <div class="pickup-box">
+      <h3 style="margin:0 0 10px;color:#c2410c;">📍 Pickup Location</h3>
+      <p style="margin:0;">
+        <strong>${escapeHtml(primaryPickup.location || passenger.address || "Not specified")}</strong>
+        ${primaryPickup.time ? `<br/>Time: ${escapeHtml(primaryPickup.time)}` : ""}
+        ${primaryPickup.details ? `<br/>${escapeHtml(primaryPickup.details)}` : ""}
+      </p>
+      ${primaryMapBtn}
+      ${
+        pickupRows
+          ? `<table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:13px;">
+              <thead>
+                <tr style="background:#ffedd5;">
+                  <th style="padding:8px;border:1px solid #eee;text-align:left;">Passenger</th>
+                  <th style="padding:8px;border:1px solid #eee;text-align:left;">Pickup</th>
+                  <th style="padding:8px;border:1px solid #eee;text-align:left;">Map</th>
+                </tr>
+              </thead>
+              <tbody>${pickupRows}</tbody>
+            </table>`
+          : ""
+      }
     </div>
 
     <div class="box">
@@ -191,12 +310,13 @@ const instructorPhone = v?.phoneNumber || "N/A";
 
     <div class="box">
       <h4>Passenger Details</h4>
-      <p><strong>Phone:</strong> ${passenger.phoneNumber}</p>
-      <p><strong>Email:</strong> ${passenger.email}</p>
-      <p><strong>ID Proof:</strong> ${passenger.idProof} - ${passenger.idProofNumber}</p>
+      <p><strong>Phone:</strong> ${escapeHtml(passenger.phoneNumber)}</p>
+      <p><strong>Email:</strong> ${escapeHtml(passenger.email)}</p>
+      <p><strong>ID Proof:</strong> ${escapeHtml(passenger.idProof)} - ${escapeHtml(passenger.idProofNumber)}</p>
+      <p><strong>Pickup Address:</strong> ${escapeHtml(passenger.address || primaryPickup.location || "—")}</p>
     </div>
 
-    <p>Please arrive at least <strong>30 minutes early</strong> with a valid ID proof.</p>
+    <p>Please arrive at least <strong>30 minutes early</strong> with a valid ID proof. Use the Google Maps link above to reach your boarding point.</p>
 
     <div class="footer">
       <p>Sunshine Holiday Packages<br/>📧 sunshineholidaypackages@gmail.com</p>

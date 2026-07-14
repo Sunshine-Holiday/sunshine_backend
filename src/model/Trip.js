@@ -53,12 +53,39 @@ const roomChoiceSchema = new mongoose.Schema({
   price: { type: Number, required: true },
 });
 
+const faqSchema = new mongoose.Schema(
+  {
+    question: { type: String, required: true },
+    answer: { type: String, required: true },
+  },
+  { _id: true }
+);
+
 // Trip Schema
 const tripSchema = new mongoose.Schema({
   banner: { type: String },
+  /** Extra gallery images (paths). Combined with banner on details page. */
+  banners: { type: [String], default: [] },
   title: { type: String },
   location: { type: String },
+  /**
+   * Destination / state tag used for navbar mega-menu filtering
+   * and /destinations/:slug pages (e.g. Mahabaleshwar, Lonavala).
+   */
+  state: { type: String, default: "", index: true },
   description: { type: String },
+  /** Point-wise trip highlights */
+  highlights: { type: [String], default: [] },
+  /** What the tour price includes */
+  includes: { type: [String], default: [] },
+  /** Google Maps link / embed URL for tour map */
+  mapLink: { type: String, default: "" },
+  /** Brochure image path (preview) */
+  brochureImage: { type: String, default: "" },
+  /** Brochure download file path (pdf/image) */
+  brochureFile: { type: String, default: "" },
+  faqs: { type: [faqSchema], default: [] },
+  cancellationPolicy: { type: String, default: "" },
   startDates: [startDateSchema],
   price: { type: String },
   category: { type: String },
@@ -69,6 +96,16 @@ const tripSchema = new mongoose.Schema({
   advancePaymentPercentage: { type: Number },
   discountPercentage: { type: Number },
   readonly: { type: Boolean, default: false },
+  /**
+   * Admin preference order (1 = first / highest priority).
+   * Contiguous 1..N; auto-adjusted when one trip's index is updated.
+   */
+  displayIndex: {
+    type: Number,
+    default: 0,
+    min: 0,
+    index: true,
+  },
 });
 
 export default mongoose.model("Trip", tripSchema);

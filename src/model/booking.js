@@ -128,6 +128,16 @@ const bookingSchema = new mongoose.Schema(
       enum: ["confirmed", "processing", "refund", "resolved"],
       default: "confirmed",
     },
+    /** Admin-only: why seats were blocked (visible to all admins) */
+    blockReason: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    isAdminBooking: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

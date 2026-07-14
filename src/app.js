@@ -20,6 +20,7 @@ import paymentRouter from "./router/payment.js";
 import privacyRouter from "./router/privacyRouter.js";
 import reviewRouter from "./router/reviewRoutes.js";
 import specialSectionRoutes from "./router/specialSectionRoutes.js";
+import pickupLocationRoutes from "./router/pickupLocationRoutes.js";
 config();
 const app = express();
 const PORT = process.env.PORT;
@@ -65,7 +66,7 @@ const corsOptions = {
 };
 
 // Middleware
-app.use(express.json({ limit: "Infinity" }));
+app.use(express.json({ limit: "50mb" }));
 app.use(cors(corsOptions));
 app.use("/uploads", express.static("uploads"));
 
@@ -83,6 +84,7 @@ app.use("/api/v1/booking", bookingRouter);
 app.use("/api/v1/payment", paymentRouter);
 app.use("/api/v1/review", reviewRouter);
 app.use("/api/v1/special-sections", specialSectionRoutes);
+app.use("/api/v1/pickup-locations", pickupLocationRoutes);
 // Error Handling
 // app.use(fileUploadErrorHandler);
 app.use(errorMiddleware);

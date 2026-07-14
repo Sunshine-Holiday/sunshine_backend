@@ -1,6 +1,65 @@
 import Review from "../model/Review.js";
 import Trip from "../model/Trip.js";
 
+/**
+ * Ensure every trip has a contiguous displayIndex 1..N
+ * (handles legacy trips without the field / gaps after delete).
+ * Sorted by existing displayIndex, then createdAt for stability.
+ */
+const ensureContiguousDisplayIndexes = async () => {
+  const trips = await Trip.find().sort({
+    displayIndex: 1,
+    _id: 1,
+  });
+
+  let needsFix = false;
+  for (let i = 0; i < trips.length; i++) {
+    const expected = i + 1;
+    if (Number(trips[i].displayIndex) !== expected) {
+      needsFix = true;
+      break;
+    }
+  }
+
+  // Also fix if any missing/zero/duplicate when length > 0
+  if (!needsFix && trips.length > 0) {
+    const seen = new Set();
+    for (const t of trips) {
+      const v = Number(t.displayIndex);
+      if (!v || v < 1 || seen.has(v)) {
+        needsFix = true;
+        break;
+      }
+      seen.add(v);
+    }
+  }
+
+  if (needsFix) {
+    // Sort: valid positive indexes first (asc), then by _id for stability
+    trips.sort((a, b) => {
+      const ai = Number(a.displayIndex) || 0;
+      const bi = Number(b.displayIndex) || 0;
+      if (ai > 0 && bi > 0 && ai !== bi) return ai - bi;
+      if (ai > 0 && bi <= 0) return -1;
+      if (bi > 0 && ai <= 0) return 1;
+      return String(a._id).localeCompare(String(b._id));
+    });
+
+    for (let i = 0; i < trips.length; i++) {
+      const next = i + 1;
+      if (Number(trips[i].displayIndex) !== next) {
+        // Use updateOne to avoid full-document validation on legacy trips
+        await Trip.updateOne(
+          { _id: trips[i]._id },
+          { $set: { displayIndex: next } }
+        );
+      }
+    }
+  }
+
+  return Trip.find().sort({ displayIndex: 1, _id: 1 });
+};
+
 export const createTrip = async (req, res) => {
   try {
     const file = req.file;
@@ -13,6 +72,7 @@ export const createTrip = async (req, res) => {
       title,
       price,
       location,
+      state,
       description,
       startDates,
       category,
@@ -83,6 +143,9 @@ export const createTrip = async (req, res) => {
     if (!location) {
       return res.status(400).json({ message: "Location is required" });
     }
+    if (!state || !String(state).trim()) {
+      return res.status(400).json({ message: "State / destination is required" });
+    }
     if (!description) {
       return res.status(400).json({ message: "Description is required" });
     }
@@ -145,6 +208,7 @@ export const createTrip = async (req, res) => {
     if (title) tripData.title = title;
     if (parsedPrice > 0) tripData.price = parsedPrice;
     if (location) tripData.location = location;
+    if (state) tripData.state = String(state).trim();
     if (description) tripData.description = description;
     if (parsedStartDates.length > 0) tripData.startDates = parsedStartDates;
     if (category) tripData.category = category;
@@ -159,6 +223,61 @@ export const createTrip = async (req, res) => {
     if (typeof discountPercentage !== "undefined") {
       tripData.discountPercentage = discountPercentage;
     }
+
+    // Details page content (optional)
+    const parseJsonArray = (field) => {
+      if (Array.isArray(field)) return field;
+      if (!field) return [];
+      try {
+        const p = JSON.parse(field);
+        return Array.isArray(p) ? p : [];
+      } catch {
+        return [];
+      }
+    };
+    const {
+      highlights,
+      includes,
+      mapLink,
+      faqs,
+      cancellationPolicy,
+      brochureImage,
+      brochureFile,
+      banners,
+    } = req.body;
+
+    const parsedHighlights = parseJsonArray(highlights).filter(
+      (h) => typeof h === "string" && h.trim()
+    );
+    const parsedIncludes = parseJsonArray(includes).filter(
+      (h) => typeof h === "string" && h.trim()
+    );
+    const parsedFaqs = parseJsonArray(faqs).filter(
+      (f) => f && f.question && f.answer
+    );
+    const parsedBanners = parseJsonArray(banners).filter(
+      (b) => typeof b === "string" && b.trim()
+    );
+
+    if (parsedHighlights.length) tripData.highlights = parsedHighlights;
+    if (parsedIncludes.length) tripData.includes = parsedIncludes;
+    if (parsedFaqs.length) tripData.faqs = parsedFaqs;
+    if (mapLink) tripData.mapLink = String(mapLink).trim();
+    if (cancellationPolicy)
+      tripData.cancellationPolicy = String(cancellationPolicy);
+    if (brochureImage) tripData.brochureImage = String(brochureImage);
+    if (brochureFile) tripData.brochureFile = String(brochureFile);
+    // Always keep banner in banners list
+    tripData.banners = [
+      file.path,
+      ...parsedBanners.filter((b) => b !== file.path),
+    ];
+
+    // New trips go to the end of preference order
+    const lastTrip = await Trip.findOne().sort({ displayIndex: -1 }).select("displayIndex");
+    const maxIndex = lastTrip?.displayIndex ? Number(lastTrip.displayIndex) : 0;
+    tripData.displayIndex = maxIndex > 0 ? maxIndex + 1 : 1;
+
     const trip = new Trip(tripData);
     const savedTrip = await trip.save();
     res.status(201).json(savedTrip);
@@ -167,12 +286,99 @@ export const createTrip = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 export const getAllTrips = async (req, res) => {
   try {
-    const trips = await Trip.find().sort({ createdAt: -1 });
+    // Preference order first (1 = highest); auto-normalize missing indexes
+    const trips = await ensureContiguousDisplayIndexes();
     res.status(200).json(trips);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * Update one trip's preference index; all other trips shift automatically.
+ * Body: { displayIndex: number }  // 1-based position
+ *
+ * Example: 5 trips [A,B,C,D,E] at 1..5
+ * Move E to index 2 → [A,E,B,C,D] with indexes 1..5
+ */
+export const updateTripDisplayIndex = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let { displayIndex } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Trip ID is required" });
+    }
+
+    displayIndex = Number(displayIndex);
+    if (!Number.isInteger(displayIndex) || displayIndex < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "displayIndex must be a positive integer starting from 1",
+      });
+    }
+
+    const trips = await ensureContiguousDisplayIndexes();
+    const total = trips.length;
+
+    if (total === 0) {
+      return res.status(404).json({ success: false, message: "No trips found" });
+    }
+
+    const trip = trips.find((t) => String(t._id) === String(id));
+    if (!trip) {
+      return res.status(404).json({ success: false, message: "Trip not found" });
+    }
+
+    // Clamp to valid range 1..total
+    const newIndex = Math.min(displayIndex, total);
+    const oldIndex = Number(trip.displayIndex);
+
+    if (oldIndex === newIndex) {
+      return res.status(200).json({
+        success: true,
+        message: "Preference unchanged",
+        trip,
+        trips,
+      });
+    }
+
+    // Remove trip from ordered list and insert at new position
+    const ordered = trips.filter((t) => String(t._id) !== String(id));
+    ordered.splice(newIndex - 1, 0, trip);
+
+    // Reassign contiguous indexes 1..N
+    // Two-pass to avoid unique conflicts if any partial unique index exists later
+    for (let i = 0; i < ordered.length; i++) {
+      await Trip.findByIdAndUpdate(ordered[i]._id, {
+        displayIndex: -(i + 1),
+      });
+    }
+    for (let i = 0; i < ordered.length; i++) {
+      await Trip.findByIdAndUpdate(ordered[i]._id, {
+        displayIndex: i + 1,
+      });
+    }
+
+    const updatedTrips = await Trip.find().sort({ displayIndex: 1, _id: 1 });
+    const updatedTrip = updatedTrips.find((t) => String(t._id) === String(id));
+
+    return res.status(200).json({
+      success: true,
+      message: `Trip preference updated to #${newIndex}. Other trips reordered automatically.`,
+      trip: updatedTrip,
+      trips: updatedTrips,
+    });
+  } catch (error) {
+    console.error("Error updating trip display index:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update trip preference",
+      error: error.message,
+    });
   }
 };
 
@@ -208,6 +414,7 @@ export const updateTrip = async (req, res) => {
       title,
       price,
       location,
+      state,
       description,
       startDates,
       category,
@@ -218,6 +425,14 @@ export const updateTrip = async (req, res) => {
       advancePaymentPercentage,
       discountPercentage,
       readonly,
+      highlights,
+      includes,
+      mapLink,
+      faqs,
+      cancellationPolicy,
+      brochureImage,
+      brochureFile,
+      banners,
     } = req.body;
 
     const file = req.file;
@@ -256,6 +471,11 @@ export const updateTrip = async (req, res) => {
 
     if (!location)
       return res.status(400).json({ message: "Location is required" });
+
+    if (!state || !String(state).trim())
+      return res
+        .status(400)
+        .json({ message: "State / destination is required" });
 
     if (!description)
       return res.status(400).json({ message: "Description is required" });
@@ -384,6 +604,7 @@ export const updateTrip = async (req, res) => {
     const updateData = {
       title,
       location,
+      state: String(state).trim(),
       description,
       category,
       price: parsedPrice,
@@ -405,6 +626,46 @@ export const updateTrip = async (req, res) => {
     if (discountPercentage !== undefined) {
       updateData.discountPercentage = discountPercentage;
     }
+
+    // Optional details-page fields
+    if (highlights !== undefined) {
+      updateData.highlights = parseArray(highlights).filter(
+        (h) => typeof h === "string" && h.trim()
+      );
+    }
+    if (includes !== undefined) {
+      updateData.includes = parseArray(includes).filter(
+        (h) => typeof h === "string" && h.trim()
+      );
+    }
+    if (faqs !== undefined) {
+      updateData.faqs = parseArray(faqs).filter(
+        (f) => f && f.question && f.answer
+      );
+    }
+    if (banners !== undefined) {
+      const list = parseArray(banners).filter(
+        (b) => typeof b === "string" && b.trim()
+      );
+      if (file?.path) {
+        updateData.banners = [
+          file.path,
+          ...list.filter((b) => b !== file.path),
+        ];
+      } else {
+        updateData.banners = list;
+      }
+    } else if (file?.path) {
+      // keep previous banners if any — append new banner at front when only file updates
+      updateData.banners = [file.path];
+    }
+    if (mapLink !== undefined) updateData.mapLink = String(mapLink || "");
+    if (cancellationPolicy !== undefined)
+      updateData.cancellationPolicy = String(cancellationPolicy || "");
+    if (brochureImage !== undefined)
+      updateData.brochureImage = String(brochureImage || "");
+    if (brochureFile !== undefined)
+      updateData.brochureFile = String(brochureFile || "");
 
     // ---------------------------
     // 🚀 UPDATE DB
@@ -430,11 +691,15 @@ export const deleteTrip = async (req, res) => {
   try {
     const id = req.params.id;
     if (!id) {
-      res.status(400).json({ message: "ID not provided" });
+      return res.status(400).json({ message: "ID not provided" });
     }
     const deletedTrip = await Trip.findByIdAndDelete(id);
     if (!deletedTrip)
       return res.status(404).json({ message: "Trip not found" });
+
+    // Compact remaining preference indexes 1..N
+    await ensureContiguousDisplayIndexes();
+
     res.status(200).json({ message: "Trip deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
