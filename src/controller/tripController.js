@@ -62,10 +62,20 @@ const ensureContiguousDisplayIndexes = async () => {
 
 export const createTrip = async (req, res) => {
   try {
-    const file = req.file;
-    if (!file || !file.path) {
-      return res.status(400).json({ message: "Image required" });
+    // Multi-banner support: all uploaded images (file + banners fields)
+    const uploaded = Array.isArray(req.uploadedFiles)
+      ? req.uploadedFiles
+      : req.file
+        ? [req.file]
+        : [];
+    const uploadedPaths = uploaded
+      .map((f) => f?.path)
+      .filter((p) => typeof p === "string" && p.trim());
+
+    if (uploadedPaths.length === 0) {
+      return res.status(400).json({ message: "At least one banner image is required" });
     }
+    const file = { path: uploadedPaths[0] };
 
     const {
       readonly,
@@ -278,11 +288,14 @@ export const createTrip = async (req, res) => {
       tripData.brochureId =
         brochureId && String(brochureId).trim() ? brochureId : null;
     }
-    // Always keep banner in banners list
-    tripData.banners = [
-      file.path,
-      ...parsedBanners.filter((b) => b !== file.path),
+    // Merge path strings from body (rare) with newly uploaded files; primary = first
+    const allBanners = [
+      ...uploadedPaths,
+      ...parsedBanners.filter((b) => !uploadedPaths.includes(b)),
     ];
+    // Dedupe preserve order
+    tripData.banners = [...new Set(allBanners.filter(Boolean))];
+    tripData.banner = tripData.banners[0];
 
     // New trips go to the end of preference order
     const lastTrip = await Trip.findOne().sort({ displayIndex: -1 }).select("displayIndex");
@@ -484,6 +497,14 @@ export const updateTrip = async (req, res) => {
     } = req.body;
 
     const file = req.file;
+    const uploaded = Array.isArray(req.uploadedFiles)
+      ? req.uploadedFiles
+      : req.file
+        ? [req.file]
+        : [];
+    const uploadedPaths = uploaded
+      .map((f) => f?.path)
+      .filter((p) => typeof p === "string" && p.trim());
 
     // ---------------------------
     // 🔧 Helpers
@@ -663,10 +684,6 @@ export const updateTrip = async (req, res) => {
       roomChoices: parsedRoomChoices, // ✅ empty array allowed
     };
 
-    if (file?.path) {
-      updateData.banner = file.path;
-    }
-
     if (advancePaymentPercentage !== undefined) {
       updateData.advancePaymentPercentage = advancePaymentPercentage;
     }
@@ -691,20 +708,42 @@ export const updateTrip = async (req, res) => {
         (f) => f && f.question && f.answer
       );
     }
-    if (banners !== undefined) {
-      const list = parseArray(banners).filter(
-        (b) => typeof b === "string" && b.trim()
-      );
-      if (file?.path) {
-        updateData.banners = [
-          file.path,
-          ...list.filter((b) => b !== file.path),
-        ];
-      } else {
-        updateData.banners = list;
+    // Multi-banner update:
+    // - body.existingBanners / body.banners (JSON) = kept existing paths
+    // - uploaded files = new images to append
+    const existingFromBody =
+      req.body.existingBanners !== undefined
+        ? req.body.existingBanners
+        : banners;
+    if (existingFromBody !== undefined || uploadedPaths.length > 0) {
+      // body.banners may be JSON string or polluted by multipart; prefer existingBanners
+      let kept = [];
+      if (existingFromBody !== undefined) {
+        kept = parseArray(existingFromBody).filter(
+          (b) => typeof b === "string" && b.trim() && !b.startsWith("{")
+        );
+        // parseArray already handles JSON string; also filter accidental non-paths
+        kept = kept.filter(
+          (b) =>
+            b.includes("uploads") ||
+            b.startsWith("http") ||
+            b.includes("/")
+        );
+      }
+      const merged = [
+        ...kept,
+        ...uploadedPaths.filter((p) => !kept.includes(p)),
+      ];
+      const unique = [...new Set(merged.filter(Boolean))];
+      if (unique.length > 0) {
+        updateData.banners = unique;
+        updateData.banner = unique[0];
+      } else if (file?.path) {
+        updateData.banners = [file.path];
+        updateData.banner = file.path;
       }
     } else if (file?.path) {
-      // keep previous banners if any — append new banner at front when only file updates
+      updateData.banner = file.path;
       updateData.banners = [file.path];
     }
     if (mapLink !== undefined) updateData.mapLink = String(mapLink || "");
