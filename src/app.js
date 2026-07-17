@@ -21,6 +21,7 @@ import privacyRouter from "./router/privacyRouter.js";
 import reviewRouter from "./router/reviewRoutes.js";
 import specialSectionRoutes from "./router/specialSectionRoutes.js";
 import pickupLocationRoutes from "./router/pickupLocationRoutes.js";
+import brochureRoutes from "./router/brochureRoutes.js";
 config();
 const app = express();
 const PORT = process.env.PORT;
@@ -85,6 +86,7 @@ app.use("/api/v1/payment", paymentRouter);
 app.use("/api/v1/review", reviewRouter);
 app.use("/api/v1/special-sections", specialSectionRoutes);
 app.use("/api/v1/pickup-locations", pickupLocationRoutes);
+app.use("/api/v1/brochures", brochureRoutes);
 // Error Handling
 // app.use(fileUploadErrorHandler);
 app.use(errorMiddleware);

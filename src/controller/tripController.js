@@ -249,6 +249,7 @@ export const createTrip = async (req, res) => {
       cancellationPolicy,
       brochureImage,
       brochureFile,
+      brochureId,
       banners,
     } = req.body;
 
@@ -273,6 +274,10 @@ export const createTrip = async (req, res) => {
       tripData.cancellationPolicy = String(cancellationPolicy);
     if (brochureImage) tripData.brochureImage = String(brochureImage);
     if (brochureFile) tripData.brochureFile = String(brochureFile);
+    if (brochureId !== undefined) {
+      tripData.brochureId =
+        brochureId && String(brochureId).trim() ? brochureId : null;
+    }
     // Always keep banner in banners list
     tripData.banners = [
       file.path,
@@ -474,6 +479,7 @@ export const updateTrip = async (req, res) => {
       cancellationPolicy,
       brochureImage,
       brochureFile,
+      brochureId,
       banners,
     } = req.body;
 
@@ -708,6 +714,10 @@ export const updateTrip = async (req, res) => {
       updateData.brochureImage = String(brochureImage || "");
     if (brochureFile !== undefined)
       updateData.brochureFile = String(brochureFile || "");
+    if (brochureId !== undefined) {
+      updateData.brochureId =
+        brochureId && String(brochureId).trim() ? brochureId : null;
+    }
 
     // Interconnected trips config
     if (req.body.interconnection !== undefined) {

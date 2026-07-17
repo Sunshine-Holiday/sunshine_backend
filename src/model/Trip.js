@@ -84,6 +84,12 @@ const tripSchema = new mongoose.Schema({
   brochureImage: { type: String, default: "" },
   /** Brochure download file path (pdf/image) */
   brochureFile: { type: String, default: "" },
+  /** Selected brochure from admin library */
+  brochureId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Brochure",
+    default: null,
+  },
   faqs: { type: [faqSchema], default: [] },
   cancellationPolicy: { type: String, default: "" },
   startDates: [startDateSchema],
