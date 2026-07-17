@@ -1044,7 +1044,11 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
       }
     }
 
-    const totalAvailableSeats = seatsPerBus * numberOfBusesAvailable;
+    // Driver seat is blocked on layouts: 20→19 bookable, 32→31 bookable
+    const bookableSeatsPerBus =
+      seatsPerBus === 20 ? 19 : seatsPerBus === 32 ? 31 : seatsPerBus;
+    const totalAvailableSeats =
+      bookableSeatsPerBus * numberOfBusesAvailable;
     const availableSeats = Math.max(0, totalAvailableSeats - totalSeatsBooked);
 
     return res.status(200).json({
@@ -1056,7 +1060,9 @@ export const getTripBookingStatsOfTrip = async (req, res) => {
         availableSeats,
         totalAvailableSeats,
         uniqueCustomers,
+        // Keep raw configured size for layout selection; capacity uses bookable
         seatsPerBus,
+        bookableSeatsPerBus,
         numberOfBusesAvailable,
       },
       selectedSeatsByBus,
