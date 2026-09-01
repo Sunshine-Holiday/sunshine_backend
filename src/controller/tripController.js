@@ -88,6 +88,7 @@ export const createTrip = async (req, res) => {
       category,
       amenities,
       boardingPoints,
+      dropPoints,
       packages,
       roomChoices,
          advancePaymentPercentage,
@@ -105,6 +106,19 @@ export const createTrip = async (req, res) => {
       ? boardingPoints
       : boardingPoints
       ? JSON.parse(boardingPoints)
+      : [];
+
+    const parsedDropPoints = Array.isArray(dropPoints)
+      ? dropPoints
+      : dropPoints
+      ? (() => {
+          try {
+            const parsed = JSON.parse(dropPoints);
+            return Array.isArray(parsed) ? parsed : [parsed];
+          } catch (e) {
+            return [];
+          }
+        })()
       : [];
 
     const parsedStartDates = Array.isArray(startDates)
@@ -230,6 +244,7 @@ export const createTrip = async (req, res) => {
     tripData.interconnection = parseInterconnectionBody(req.body);
     if (parsedAmenities.length > 0) tripData.amenities = parsedAmenities;
     if (parsedBoardingPoints.length > 0) tripData.boardingPoints = parsedBoardingPoints;
+    if (parsedDropPoints.length > 0) tripData.dropPoints = parsedDropPoints;
     if (parsedPackages.length > 0) tripData.packages = parsedPackages;
     if (parsedRoomChoices.length > 0) tripData.roomChoices = parsedRoomChoices;
  
@@ -480,6 +495,7 @@ export const updateTrip = async (req, res) => {
       category,
       amenities,
       boardingPoints,
+      dropPoints,
       packages,
       roomChoices,
       advancePaymentPercentage,
@@ -525,6 +541,7 @@ export const updateTrip = async (req, res) => {
     // ---------------------------
     const parsedAmenities = parseArray(amenities);
     const parsedBoardingPoints = parseArray(boardingPoints);
+    const parsedDropPoints = parseArray(dropPoints);
     const parsedStartDates = parseArray(startDates);
     const parsedPackages = parseArray(packages);
     const parsedRoomChoices = parseArray(roomChoices);
@@ -680,6 +697,7 @@ export const updateTrip = async (req, res) => {
       startDates: parsedStartDates,
       amenities: parsedAmenities,
       boardingPoints: parsedBoardingPoints,
+      dropPoints: parsedDropPoints,
       packages: parsedPackages,     // ✅ empty array allowed
       roomChoices: parsedRoomChoices, // ✅ empty array allowed
     };

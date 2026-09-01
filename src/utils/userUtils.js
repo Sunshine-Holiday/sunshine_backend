@@ -143,7 +143,7 @@ export const resolvePickupMapInfo = (passenger, trip) => {
   const points = Array.isArray(trip?.boardingPoints) ? trip.boardingPoints : [];
 
   if (!address && points.length === 0) {
-    return { location: "", time: "", details: "", mapUrl: "" };
+    return { location: "", date: "", time: "", details: "", mapUrl: "" };
   }
 
   let point =
@@ -168,6 +168,7 @@ export const resolvePickupMapInfo = (passenger, trip) => {
   }
 
   const location = point?.location || address || "";
+  const date = point?.date || "";
   const time = point?.time || "";
   const details = point?.details || "";
   let mapUrl = String(point?.maplink || "").trim();
@@ -178,7 +179,51 @@ export const resolvePickupMapInfo = (passenger, trip) => {
     )}`;
   }
 
-  return { location, time, details, mapUrl };
+  return { location, date, time, details, mapUrl };
+};
+
+/**
+ * Resolve the passenger's selected drop location from the trip
+ * and return a Google Maps link (no date, no time).
+ */
+export const resolveDropMapInfo = (passenger, trip) => {
+  const dropLoc = String(passenger?.dropLocation || "").trim();
+  const points = Array.isArray(trip?.dropPoints) ? trip.dropPoints : [];
+
+  if (!dropLoc && points.length === 0) {
+    return { location: "", details: "", mapUrl: "" };
+  }
+
+  let point =
+    points.find((p) => String(p?.location || "").trim() === dropLoc) || null;
+
+  if (!point && dropLoc) {
+    point =
+      points.find((p) => {
+        const loc = String(p?.location || "").trim();
+        return (
+          dropLoc.startsWith(loc) ||
+          dropLoc.includes(loc) ||
+          loc.includes(dropLoc)
+        );
+      }) || null;
+  }
+
+  if (!point && points.length === 1 && !dropLoc) {
+    point = points[0];
+  }
+
+  const location = point?.location || dropLoc || "";
+  const details = point?.details || "";
+  let mapUrl = String(point?.maplink || "").trim();
+
+  if (!mapUrl && location) {
+    mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+      location
+    )}`;
+  }
+
+  return { location, details, mapUrl };
 };
 
 const escapeHtml = (value) =>
@@ -204,43 +249,57 @@ export const generateBookingConfirmationHTML = (booking, passenger, trip, vehicl
     })
     .join("<br/>");
 
-  // All passengers' pickup points (admin email benefits from full list)
+  // All passengers' pickup and drop points (admin email benefits from full list)
   const passengers = Array.isArray(booking.passengers) ? booking.passengers : [passenger];
   const pickupRows = passengers
     .map((p) => {
-      const info = resolvePickupMapInfo(p, trip);
-      if (!info.location && !info.mapUrl) return "";
-      const mapLinkHtml = info.mapUrl
-        ? `<a href="${escapeHtml(info.mapUrl)}" target="_blank" rel="noopener noreferrer" style="color:#ea580c;font-weight:bold;text-decoration:underline;">Open Google Maps →</a>`
-        : "N/A";
+      const pickupInfo = resolvePickupMapInfo(p, trip);
+      const dropInfo = resolveDropMapInfo(p, trip);
+      if (!pickupInfo.location && !dropInfo.location) return "";
+      const pickupMapLinkHtml = pickupInfo.mapUrl
+        ? `<a href="${escapeHtml(pickupInfo.mapUrl)}" target="_blank" rel="noopener noreferrer" style="color:#ea580c;font-weight:bold;text-decoration:underline;">Pickup Map →</a>`
+        : "—";
+      const dropMapLinkHtml = dropInfo.mapUrl
+        ? `<a href="${escapeHtml(dropInfo.mapUrl)}" target="_blank" rel="noopener noreferrer" style="color:#0284c7;font-weight:bold;text-decoration:underline;">Drop Map →</a>`
+        : "—";
       return `
         <tr>
           <td style="padding:8px;border:1px solid #eee;vertical-align:top;">
             <strong>${escapeHtml(p?.name || "Passenger")}</strong>
           </td>
           <td style="padding:8px;border:1px solid #eee;vertical-align:top;">
-            ${escapeHtml(info.location || "—")}${info.time ? ` <span style="color:#666;">(${escapeHtml(info.time)})</span>` : ""}
-            ${info.details ? `<br/><span style="color:#666;font-size:12px;">${escapeHtml(info.details)}</span>` : ""}
+            ${escapeHtml(pickupInfo.location || "—")}${pickupInfo.date ? ` <span style="color:#475569;font-weight:600;">[${escapeHtml(pickupInfo.date)}]</span>` : ""}${pickupInfo.time ? ` <span style="color:#666;">(${escapeHtml(pickupInfo.time)})</span>` : ""}
+            ${pickupInfo.details ? `<br/><span style="color:#666;font-size:12px;">${escapeHtml(pickupInfo.details)}</span>` : ""}
           </td>
           <td style="padding:8px;border:1px solid #eee;vertical-align:top;">
-            ${mapLinkHtml}
+            ${escapeHtml(dropInfo.location || "—")}
+            ${dropInfo.details ? `<br/><span style="color:#666;font-size:12px;">${escapeHtml(dropInfo.details)}</span>` : ""}
+          </td>
+          <td style="padding:8px;border:1px solid #eee;vertical-align:top;white-space:nowrap;">
+            ${pickupMapLinkHtml}<br/>${dropMapLinkHtml}
           </td>
         </tr>`;
     })
     .filter(Boolean)
     .join("");
 
-  // Primary passenger pickup (for user-facing copy)
+  // Primary passenger pickup & drop (for user-facing copy)
   const primaryPickup = resolvePickupMapInfo(passenger, trip);
-  const primaryMapBtn = primaryPickup.mapUrl
-    ? `<p style="margin:12px 0 0;">
+  const primaryDrop = resolveDropMapInfo(passenger, trip);
+  const primaryPickupMapBtn = primaryPickup.mapUrl
+    ? `<p style="margin:10px 0 0;">
         <a href="${escapeHtml(primaryPickup.mapUrl)}" target="_blank" rel="noopener noreferrer"
-           style="display:inline-block;background:#ea580c;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold;">
+           style="display:inline-block;background:#ea580c;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:13px;">
           📍 Open Pickup on Google Maps
         </a>
-      </p>
-      <p style="font-size:12px;color:#666;word-break:break-all;margin:8px 0 0;">
-        ${escapeHtml(primaryPickup.mapUrl)}
+      </p>`
+    : "";
+  const primaryDropMapBtn = primaryDrop.mapUrl
+    ? `<p style="margin:10px 0 0;">
+        <a href="${escapeHtml(primaryDrop.mapUrl)}" target="_blank" rel="noopener noreferrer"
+           style="display:inline-block;background:#0284c7;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:13px;">
+          📍 Open Drop Location on Google Maps
+        </a>
       </p>`
     : "";
 
@@ -256,6 +315,7 @@ export const generateBookingConfirmationHTML = (booking, passenger, trip, vehicl
     .box { border:1px solid #ddd; padding:15px; margin-top:15px; border-radius:4px; }
     .footer { font-size:12px; color:#666; text-align:center; margin-top:20px; }
     .pickup-box { border:1px solid #fdba74; background:#fff7ed; padding:15px; margin-top:15px; border-radius:4px; }
+    .drop-box { border:1px solid #bae6fd; background:#f0f9ff; padding:15px; margin-top:15px; border-radius:4px; }
   </style>
 </head>
 <body>
@@ -278,28 +338,44 @@ export const generateBookingConfirmationHTML = (booking, passenger, trip, vehicl
     </div>
 
     <div class="pickup-box">
-      <h3 style="margin:0 0 10px;color:#c2410c;">📍 Pickup Location</h3>
+      <h3 style="margin:0 0 8px;color:#c2410c;">📍 Pickup Location</h3>
       <p style="margin:0;">
         <strong>${escapeHtml(primaryPickup.location || passenger.address || "Not specified")}</strong>
-        ${primaryPickup.time ? `<br/>Time: ${escapeHtml(primaryPickup.time)}` : ""}
+        ${primaryPickup.date ? `<br/><strong>Date:</strong> ${escapeHtml(primaryPickup.date)}` : ""}
+        ${primaryPickup.time ? `<br/><strong>Time:</strong> ${escapeHtml(primaryPickup.time)}` : ""}
         ${primaryPickup.details ? `<br/>${escapeHtml(primaryPickup.details)}` : ""}
       </p>
-      ${primaryMapBtn}
-      ${
-        pickupRows
-          ? `<table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:13px;">
+      ${primaryPickupMapBtn}
+    </div>
+
+    ${primaryDrop.location || passenger.dropLocation ? `
+    <div class="drop-box">
+      <h3 style="margin:0 0 8px;color:#0369a1;">🏁 Drop Location</h3>
+      <p style="margin:0;">
+        <strong>${escapeHtml(primaryDrop.location || passenger.dropLocation || "Not specified")}</strong>
+        ${primaryDrop.details ? `<br/>${escapeHtml(primaryDrop.details)}` : ""}
+      </p>
+      ${primaryDropMapBtn}
+    </div>` : ""}
+
+    ${
+      pickupRows
+        ? `<div class="box">
+            <h4 style="margin:0 0 10px;">Passenger Pickup & Drop Details</h4>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
               <thead>
-                <tr style="background:#ffedd5;">
+                <tr style="background:#f8fafc;">
                   <th style="padding:8px;border:1px solid #eee;text-align:left;">Passenger</th>
-                  <th style="padding:8px;border:1px solid #eee;text-align:left;">Pickup</th>
+                  <th style="padding:8px;border:1px solid #eee;text-align:left;">Pickup (Date & Time)</th>
+                  <th style="padding:8px;border:1px solid #eee;text-align:left;">Drop Location</th>
                   <th style="padding:8px;border:1px solid #eee;text-align:left;">Map</th>
                 </tr>
               </thead>
               <tbody>${pickupRows}</tbody>
-            </table>`
-          : ""
-      }
-    </div>
+            </table>
+          </div>`
+        : ""
+    }
 
     <div class="box">
       <p><strong>Total Price:</strong> ₹${booking.price}</p>
@@ -313,10 +389,11 @@ export const generateBookingConfirmationHTML = (booking, passenger, trip, vehicl
       <p><strong>Phone:</strong> ${escapeHtml(passenger.phoneNumber)}</p>
       <p><strong>Email:</strong> ${escapeHtml(passenger.email)}</p>
       <p><strong>ID Proof:</strong> ${escapeHtml(passenger.idProof)} - ${escapeHtml(passenger.idProofNumber)}</p>
-      <p><strong>Pickup Address:</strong> ${escapeHtml(passenger.address || primaryPickup.location || "—")}</p>
+      <p><strong>Pickup Address:</strong> ${escapeHtml(passenger.address || primaryPickup.location || "—")}${primaryPickup.date ? ` (${escapeHtml(primaryPickup.date)})` : ""}${primaryPickup.time ? ` (${escapeHtml(primaryPickup.time)})` : ""}</p>
+      <p><strong>Drop Location:</strong> ${escapeHtml(passenger.dropLocation || primaryDrop.location || "—")}</p>
     </div>
 
-    <p>Please arrive at least <strong>30 minutes early</strong> with a valid ID proof. Use the Google Maps link above to reach your boarding point.</p>
+    <p>Please arrive at least <strong>30 minutes early</strong> with a valid ID proof. Use the Google Maps links above to reach your boarding and drop points.</p>
 
     <div class="footer">
       <p>Sunshine Holiday Packages<br/>📧 sunshineholidaypackages@gmail.com</p>

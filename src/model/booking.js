@@ -48,6 +48,7 @@ const passengerSchema = new mongoose.Schema({
     trim: true,
   },
   address: { type: String, trim: true },
+  dropLocation: { type: String, trim: true, default: "" },
 });
 
 const bookingSchema = new mongoose.Schema(

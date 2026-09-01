@@ -7,10 +7,18 @@ const vehicleSchema = new mongoose.Schema({
   phoneNumber: { type: String, required: true },
 });
 
-// Boarding Point Schema
+// Boarding Point Schema (Pickup locations with Date and Time)
 const boardingPointSchema = new mongoose.Schema({
   location: { type: String },
+  date: { type: String },
   time: { type: String },
+  details: { type: String },
+  maplink: { type: String },
+});
+
+// Drop Point Schema (Drop locations WITHOUT Date and Time)
+const dropPointSchema = new mongoose.Schema({
+  location: { type: String },
   details: { type: String },
   maplink: { type: String },
 });
@@ -97,6 +105,7 @@ const tripSchema = new mongoose.Schema({
   category: { type: String },
   amenities: { type: [String], default: [] },
   boardingPoints: [boardingPointSchema],
+  dropPoints: { type: [dropPointSchema], default: [] },
   packages: [packageSchema],
   roomChoices: [roomChoiceSchema],
   advancePaymentPercentage: { type: Number },
