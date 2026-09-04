@@ -70,6 +70,19 @@ const boardingPoints = [
   },
 ];
 
+const dropPoints = [
+  {
+    location: "Mahabaleshwar - Main Market",
+    details: "Near ST bus stand",
+    maplink: "https://maps.google.com/?q=Mahabaleshwar+Main+Market",
+  },
+  {
+    location: "Mahabaleshwar - Venna Lake",
+    details: "Boating club parking",
+    maplink: "https://maps.google.com/?q=Venna+Lake+Mahabaleshwar",
+  },
+];
+
 async function upsertTrip(filter, data) {
   let trip = await Trip.findOne(filter);
   if (trip) {
@@ -110,6 +123,7 @@ async function main() {
     banners: [PLACEHOLDER_BANNER],
     amenities: ["AC", "Music and Fun", "Charging Points"],
     boardingPoints,
+    dropPoints,
     advancePaymentPercentage: 30,
     discountPercentage: 0,
     highlights: [

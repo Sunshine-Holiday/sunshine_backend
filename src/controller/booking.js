@@ -844,6 +844,7 @@ export const getTripBookingHistory = async (req, res) => {
             idProof: p.idProof,
             idProofNumber: p.idProofNumber,
             address: p.address || "",
+            dropLocation: p.dropLocation || "",
           },
 
           // Individual seat for THIS passenger
@@ -1396,6 +1397,8 @@ export const getDayWiseBookings = async (req, res) => {
           idProofNumber: p.idProofNumber,
           age: p.age,
           gender: p.gender,
+          address: p.address || "",
+          dropLocation: p.dropLocation || "",
         })),
       };
     });
