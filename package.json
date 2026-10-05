@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "seed:mahabaleshwar": "node src/scripts/seedMahabaleshwarInterconnection.js"
+    "seed:mahabaleshwar": "node src/scripts/seedMahabaleshwarInterconnection.js",
+    "test": "node --test test/*.test.js"
   },
   "keywords": [],
   "author": "",

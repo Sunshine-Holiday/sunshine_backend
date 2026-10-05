@@ -1,6 +1,7 @@
 // routes/tripRoutes.js
 import express from 'express';
 import {
+  duplicateTrip,
   createTrip,
   deleteTrip,
   getAllTrips,
@@ -22,6 +23,7 @@ router.put(
   adminOnly,
   updateTripDisplayIndex
 );
+router.post('/:id/duplicate', isAuthenticated, adminOnly, duplicateTrip);
 router.get('/:id', getTripById);
 router.put('/:id',isAuthenticated,adminOnly,uploadTripBanners, updateTrip);
 router.delete('/trip/:id', isAuthenticated,adminOnly,deleteTrip);

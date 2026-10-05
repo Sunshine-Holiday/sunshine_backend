@@ -851,3 +851,26 @@ export const deleteTrip = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+// Copy trip content and dates with fresh subdocument IDs; bookings are never copied.
+export const duplicateTrip = async (req, res, next) => {
+  try {
+    const source = await Trip.findById(req.params.id).lean();
+    if (!source) return res.status(404).json({ message: "Trip not found" });
+    const stripIds = value => {
+      if (Array.isArray(value)) return value.map(stripIds);
+      if (value && typeof value === "object" && !(value instanceof Date)) {
+        return Object.fromEntries(Object.entries(value).filter(([key]) => !["_id", "__v", "createdAt", "updatedAt"].includes(key)).map(([key, val]) => [key, stripIds(val)]));
+      }
+      return value;
+    };
+    // JSON keeps ObjectId references as strings before removing embedded IDs.
+    const data = stripIds(JSON.parse(JSON.stringify(source)));
+    data.title = `${source.title || "Trip"} (Copy)`;
+    data.displayIndex = (await Trip.countDocuments()) + 1;
+    // A copied package gets its own buses. Linking it to the source's shared
+    // inventory requires an explicit admin choice after duplication.
+    data.interconnection = { enabled: false, role: "none", dayOffset: source.interconnection?.dayOffset || 1 };
+    const trip = await Trip.create(data);
+    res.status(201).json({ success: true, trip });
+  } catch (error) { next(error); }
+};

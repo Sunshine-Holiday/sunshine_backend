@@ -1,3 +1,5 @@
+import { bookingError, checkSeats, prepareBooking, seatScopes, withSeatTransaction } from "../services/bookingSafety.js";
+import { finalizePayment, validSignature } from "../services/paymentSafety.js";
 import mongoose from "mongoose";
 import Booking from "../model/booking.js";
 import Trip from "../model/Trip.js";
@@ -44,309 +46,25 @@ const checkRequiredFields = (fields, res) => {
 
 export const createBooking = async (req, res) => {
   try {
-    const {
-      tripId,
-      selectedPackage,
-      selectedRoomChoice,
-      roomCount = 0,
-      price,
-      advancePaid = 0,
-      selectedDate, // must be "DD-MM-YYYY"
-      passengers,
-      selectedSeats, // [{seat:"3", busIndex:0}, ...]
-      isadminBooking = false,
-      blockReason = "",
-    } = req.body;
-
-    // ---------------------------
-    // 🔴 REQUIRED FIELD CHECK
-    // ---------------------------
-    if (
-      !tripId ||
-      price == null ||
-      !selectedDate ||
-      !Array.isArray(passengers) ||
-      passengers.length === 0 ||
-      !Array.isArray(selectedSeats) ||
-      selectedSeats.length === 0
-    ) {
-      return res.status(400).json({
-        message: "Missing required booking fields",
+    if (req.body.isadminBooking === true) {
+      const { trip, bookingData } = await prepareBooking(req.body, true);
+      const booking = await withSeatTransaction(trip, bookingData.selectedDate, async session => {
+        await checkSeats(trip, bookingData, session);
+        const booking = new Booking(bookingData);
+        await booking.save({ session });
+        return booking;
       });
+      return res.status(201).json({ success: true, message: "Seats blocked successfully", booking });
     }
-
-    // ---------------------------
-    // 🧭 VALIDATE TRIP
-    // ---------------------------
-    if (!mongoose.Types.ObjectId.isValid(tripId)) {
-      return res.status(400).json({ message: "Invalid trip ID" });
+    const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body;
+    if (!validSignature(`${orderId}|${paymentId}`, signature, process.env.RAZORPAY_KEY_SECRET)) {
+      return res.status(400).json({ message: "Invalid payment verification" });
     }
-
-    const trip = await Trip.findById(tripId);
-    if (!trip) {
-      return res.status(404).json({ message: "Trip not found" });
-    }
-
-    // ---------------------------
-    // 📅 DATE FORMAT VALIDATION
-    // ---------------------------
-    if (!/^\d{2}-\d{2}-\d{4}$/.test(String(selectedDate))) {
-      return res.status(400).json({
-        message: "Selected date must be DD-MM-YYYY",
-      });
-    }
-
-    // ---------------------------
-    // ✅ FIND START DATE + VEHICLES FOR THIS DATE
-    // ---------------------------
-    const startDateObj =
-      trip.startDates?.find((sd) => String(sd?.date).trim() === String(selectedDate).trim()) ||
-      null;
-
-    const vehicles = startDateObj?.vehicles || [];
-
-    // (Optional) If you want to ensure buses exist when using multi-bus seats:
-    // if (!startDateObj) {
-    //   return res.status(400).json({ message: "Selected date not available for this trip" });
-    // }
-
-    // ---------------------------
-    // 📦 PACKAGE / ROOM VALIDATION
-    // ---------------------------
-    if (selectedPackage && !mongoose.Types.ObjectId.isValid(selectedPackage)) {
-      return res.status(400).json({ message: "Invalid package ID" });
-    }
-
-    if (
-      selectedRoomChoice &&
-      !mongoose.Types.ObjectId.isValid(selectedRoomChoice)
-    ) {
-      return res.status(400).json({ message: "Invalid room choice ID" });
-    }
-
-    if (selectedRoomChoice) {
-      const minRooms = Math.ceil(passengers.length / 2);
-      if (!roomCount || roomCount < minRooms) {
-        return res.status(400).json({
-          message: `Room count must be at least ${minRooms}`,
-        });
-      }
-    } else if (roomCount > 0) {
-      return res.status(400).json({
-        message: "Room count provided without selecting a room",
-      });
-    }
-
-    // ---------------------------
-    // 👤 PASSENGER VALIDATION
-    // ---------------------------
-    const validPassengers = passengers.every(
-      (p) =>
-        p?.name &&
-        p?.age &&
-        ["male", "female", "other"].includes(p?.gender) &&
-        ["aadhar", "pan"].includes(p?.idProof) &&
-        p?.idProofNumber &&
-        p?.phoneNumber &&
-        p?.email
-    );
-
-    if (!validPassengers) {
-      return res.status(400).json({
-        message: "Invalid passenger details",
-      });
-    }
-
-    // ---------------------------
-    // 🪑 SEAT VALIDATION (MULTI BUS)
-    // ---------------------------
-    const seatsAreValid = selectedSeats.every(
-      (s) =>
-        typeof s === "object" &&
-        typeof s.seat === "string" &&
-        s.seat.trim() !== "" &&
-        typeof s.busIndex === "number" &&
-        Number.isFinite(s.busIndex) &&
-        s.busIndex >= 0
-    );
-
-    if (!seatsAreValid) {
-      return res.status(400).json({
-        message: "Each seat must contain seat (string) and busIndex (number >= 0)",
-      });
-    }
-
-    // ✅ if trip has vehicles list for this date, validate busIndex within range
-    if (vehicles.length > 0) {
-      const maxBusIndex = vehicles.length - 1;
-      const busIndexOk = selectedSeats.every((s) => s.busIndex <= maxBusIndex);
-      if (!busIndexOk) {
-        return res.status(400).json({
-          message: `Invalid busIndex. Max allowed busIndex is ${maxBusIndex}.`,
-        });
-      }
-    }
-
-    // ---------------------------
-    // 🔒 PREVENT DOUBLE BOOKING
-    // (same trip + interconnected linked trips: Sat/Sun/2D1N)
-    // ---------------------------
-    // Normalize legs on seats
-    const normalizedSeats = selectedSeats.map((s) => ({
-      seat: String(s.seat).trim(),
-      busIndex: Number(s.busIndex),
-      leg: ["going", "coming", "single"].includes(s.leg) ? s.leg : "single",
-    }));
-
-    // Stay interconnected bookings must provide both going + coming seats
-    const ic = trip.interconnection || {};
-    if (ic.enabled && ic.role === "stay") {
-      const goingCount = normalizedSeats.filter((s) => s.leg === "going").length;
-      const comingCount = normalizedSeats.filter(
-        (s) => s.leg === "coming"
-      ).length;
-      if (goingCount === 0 || comingCount === 0) {
-        return res.status(400).json({
-          message:
-            "Stay package requires seats for both Going and Coming legs",
-        });
-      }
-      if (goingCount !== comingCount) {
-        return res.status(400).json({
-          message:
-            "Number of Going seats must match number of Coming seats",
-        });
-      }
-    }
-
-    const {
-      hasInterconnectedSeatConflict,
-    } = await import("../utils/interconnection.js");
-
-    const icConflict = await hasInterconnectedSeatConflict(
-      trip,
-      selectedDate,
-      normalizedSeats
-    );
-    if (icConflict.conflict) {
-      return res.status(400).json({
-        message:
-          icConflict.message ||
-          "One or more selected seats are already booked on linked trips",
-      });
-    }
-
-    // ---------------------------
-    // 💰 PAYMENT VALIDATION
-    // ---------------------------
-    const totalPrice = Number(price);
-    const adv = Number(advancePaid);
-
-    if (!Number.isFinite(totalPrice) || !Number.isFinite(adv)) {
-      return res.status(400).json({ message: "Invalid price values" });
-    }
-
-    if (totalPrice < 0 || adv < 0) {
-      return res.status(400).json({
-        message: "Price values cannot be negative",
-      });
-    }
-
-    if (adv > totalPrice) {
-      return res.status(400).json({
-        message: "Advance paid cannot exceed total price",
-      });
-    }
-
-    const remainingBalance = totalPrice - adv;
-
-    let paymentStatus = "pending";
-    if (adv > 0 && adv < totalPrice) paymentStatus = "advance";
-    if (adv >= totalPrice) paymentStatus = "full";
-
-    // ---------------------------
-    // ✅ CREATE BOOKING
-    // ---------------------------
-    const adminBlock = Boolean(isadminBooking);
-    const reason = String(blockReason || "").trim();
-
-    // Admin seat blocks must include a reason for other admins
-    if (adminBlock && !reason) {
-      return res.status(400).json({
-        message: "Please add a reason for blocking the seat(s)",
-      });
-    }
-
-    const booking = new Booking({
-      trip: tripId,
-      selectedPackage: selectedPackage || null,
-      selectedRoomChoice: selectedRoomChoice || null,
-      roomCount,
-      price: totalPrice,
-      advancePaid: adv,
-      remainingBalance,
-      paymentStatus,
-      passengers,
-      selectedSeats: normalizedSeats,
-      selectedDate,
-      hasReview: false,
-      reviewEnabled: false,
-      status: "confirmed",
-      isAdminBooking: adminBlock,
-      blockReason: adminBlock ? reason : "",
-    });
-
-    await booking.save();
-
-    // ---------------------------
-    // ✉️ EMAILS (include vehicles so invoice shows bus+vehicle+instructor)
-    // ---------------------------
-    if (!adminBlock) {
-      const emailPromises = booking.passengers.map((passenger) => {
-        const htmlContent = generateBookingConfirmationHTML(
-          booking,
-          passenger,
-          trip,
-          vehicles // ✅ PASS VEHICLES
-        );
-
-        return sendMail({
-          email: passenger.email,
-          subject: "Booking Confirmation",
-          html: htmlContent,
-        });
-      });
-
-      // Admin copy
-      emailPromises.push(
-        sendMail({
-          email: "sunshineholidaypackages@gmail.com",
-          subject: "New Booking Confirmation",
-          html: generateBookingConfirmationHTML(
-            booking,
-            booking.passengers[0],
-            trip,
-            vehicles // ✅ PASS VEHICLES
-          ),
-        })
-      );
-
-      await Promise.all(emailPromises);
-    }
-
-    return res.status(201).json({
-      message: "Booking created successfully",
-      booking,
-      meta: {
-        selectedDateFound: Boolean(startDateObj),
-        vehiclesCount: vehicles.length,
-      },
-    });
+    const result = await finalizePayment(orderId, paymentId);
+    if (result.status !== "confirmed") return res.status(409).json({ refundRequired: true, alertId: result.alertId, message: "Your payment was received, but the selected seats were booked by another customer. A refund alert has been sent to the admin. Please contact Sunshine for your refund." });
+    return res.status(201).json({ success: true, booking: result.booking, message: "Booking confirmed" });
   } catch (error) {
-    console.error("Create booking error:", error);
-    return res.status(500).json({
-      message: error.message || "Internal server error",
-    });
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || "Unable to confirm booking" });
   }
 };
 
@@ -354,52 +72,31 @@ export const createBooking = async (req, res) => {
 // Update an existing booking
 export const updateBooking = async (req, res) => {
   try {
-    const { bookingId } = req.params;
-    const { tripId, userId, price, passengers, selectedDate, selectedSeats } =
-      req.body;
-    // console.log(req.body)
-    // Check for required fields
-    const missingFieldsError = checkRequiredFields(
-      { tripId, userId, price, passengers, selectedDate, selectedSeats },
-      res,
-    );
-    if (missingFieldsError) return missingFieldsError;
-
-    // Find the booking by id
-    const booking = await Booking.findById(bookingId);
-    if (!booking) {
-      // console.log("hello");
-      return res.status(404).json({ message: "Booking not found" });
-    }
-
-    // Validate trip and user
-    const trip = tripId ? await validateTrip(tripId, res) : booking.trip;
-    if (!trip) return; // Exit if trip is not found
-
-    const user = userId ? await validateUser(userId, res) : booking.user;
-    if (!user) return; // Exit if user is not found
-
-    // Update booking details
-    booking.trip = tripId || booking.trip;
-    booking.user = userId || booking.user;
-    booking.price = price || booking.price;
-    booking.passengers = passengers || booking.passengers;
-    booking.selectedDate = selectedDate || booking.selectedDate;
-    booking.selectedSeats = selectedSeats || booking.selectedSeats;
-
-    // Save the updated booking
-    await booking.save();
-    return res.status(200).json(booking);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: error.message || "Server error" });
-  }
+    const id = req.params.id;
+    const existing = await Booking.findById(id);
+    if (!existing) throw bookingError("Booking not found", 404);
+    const previousTrip = await Trip.findById(existing.trip);
+    const data = { ...existing.toObject(), ...req.body, tripId: req.body.tripId || String(existing.trip), blockReason: req.body.blockReason || existing.blockReason || "Admin edit" };
+    const { trip, bookingData } = await prepareBooking(data, true);
+    bookingData.status = existing.status;
+    bookingData.isAdminBooking = existing.isAdminBooking;
+    bookingData.blockReason = existing.isAdminBooking ? data.blockReason : "";
+    const booking = await withSeatTransaction(trip, bookingData.selectedDate, async session => {
+      await checkSeats(trip, bookingData, session, id);
+      const current = await Booking.findById(id).session(session);
+      if (!current) throw bookingError("Booking not found", 404);
+      current.set(bookingData);
+      await current.save({ session });
+      return current;
+    }, previousTrip ? seatScopes(previousTrip, existing.selectedDate) : []);
+    return res.json(booking);
+  } catch (error) { return res.status(error.statusCode || 500).json({ message: error.message }); }
 };
 
 // Delete a booking by its id
 export const deleteBooking = async (req, res) => {
   try {
-    const { bookingId } = req.params;
+    const bookingId = req.params.id;
 
     // Find and delete the booking
     const booking = await Booking.findByIdAndDelete(bookingId);
@@ -1221,89 +918,27 @@ export const getProcessingBookings = async (req, res) => {
 export const updateBookingSeats = async (req, res) => {
   try {
     const { bookingId } = req.params;
-    const { oldSeat, newSeat } = req.body;
-    console.log(req.body);
-    console.log({ oldSeat, newSeat, bookingId });
-    // Validate input
-    if (!bookingId || !oldSeat || !newSeat) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Booking ID, old seat number, and new seat number are required",
-      });
-    }
-
-    // Find the booking
-    const booking = await Booking.findById(bookingId)
-      .populate("trip")
-      .populate("user");
-
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found",
-      });
-    }
-
-    // Check if old seat exists in the booking
-    const seatIndex = booking.selectedSeats.indexOf(oldSeat);
-    if (seatIndex === -1) {
-      return res.status(400).json({
-        success: false,
-        message: "Old seat number not found in this booking",
-      });
-    }
-
-    // Get trip details to validate seat availability
-    const trip = booking.trip;
-    const totalSeats = trip.totalSeats || 31; // Default to 31 if not specified
-
-    // Validate new seat
-    if (parseInt(newSeat) > totalSeats || parseInt(newSeat) < 1) {
-      return res.status(400).json({
-        success: false,
-        message: `New seat number must be between 1 and ${totalSeats}`,
-      });
-    }
-
-    // Check if new seat is already booked (across all bookings for this trip)
-    const conflictingBooking = await Booking.findOne({
-      trip: trip._id,
-      selectedSeats: newSeat,
-      _id: { $ne: bookingId }, // Exclude current booking
-      selectedDate: booking.selectedDate,
+    const { oldSeat, newSeat, busIndex = 0, leg = "single" } = req.body;
+    if (!oldSeat || !newSeat || !Number.isInteger(Number(busIndex)) || Number(busIndex) < 0) throw bookingError("Enter the old seat, new seat and bus");
+    const existing = await Booking.findById(bookingId);
+    if (!existing) throw bookingError("Booking not found", 404);
+    const trip = await Trip.findById(existing.trip);
+    if (!trip) throw bookingError("Trip not found", 404);
+    const booking = await withSeatTransaction(trip, existing.selectedDate, async session => {
+      const current = await Booking.findById(bookingId).session(session);
+      if (!current) throw bookingError("Booking not found", 404);
+      const index = current.selectedSeats.findIndex(s => s.seat === String(oldSeat) && s.busIndex === Number(busIndex) && (s.leg || "single") === leg);
+      if (index < 0) throw bookingError("Old seat not found on this bus and leg");
+      const seats = current.selectedSeats.map(s => s.toObject());
+      seats[index] = { seat: String(newSeat), busIndex: Number(busIndex), leg };
+      const { bookingData } = await prepareBooking({ ...current.toObject(), tripId: String(trip._id), selectedSeats: seats, blockReason: current.blockReason || "Admin seat change" }, true);
+      await checkSeats(trip, bookingData, session, bookingId);
+      current.selectedSeats = bookingData.selectedSeats;
+      await current.save({ session });
+      return current;
     });
-
-    if (conflictingBooking) {
-      return res.status(400).json({
-        success: false,
-        message: "New seat number is already booked",
-      });
-    }
-
-    // Update the seat
-    booking.selectedSeats[seatIndex] = newSeat;
-    await booking.save();
-
-    // Return updated booking
-    return res.status(200).json({
-      success: true,
-      message: "Seat updated successfully",
-      data: {
-        bookingId: booking._id,
-        oldSeat,
-        newSeat,
-        selectedSeats: booking.selectedSeats,
-      },
-    });
-  } catch (error) {
-    console.error("Error updating booking seats:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
-  }
+    return res.json({ success: true, message: "Seat updated successfully", data: { bookingId, selectedSeats: booking.selectedSeats } });
+  } catch (error) { return res.status(error.statusCode || 500).json({ success: false, message: error.message }); }
 };
 
 export const deleteBookingSeats = async (req, res) => {

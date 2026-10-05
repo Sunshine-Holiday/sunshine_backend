@@ -36,7 +36,7 @@ router.get("/history/:id/:date", getTripBookingHistory);
 
 // ================= CRUD =================
 router.get("/", isAuthenticated, adminOnly, getAllBookings);
-router.post("/", createBooking);
+router.post("/", (req, res, next) => req.body.isadminBooking === true ? isAuthenticated(req, res, error => error ? next(error) : adminOnly(req, res, next)) : next(), createBooking);
 router.put("/:id", isAuthenticated, adminOnly, updateBooking);
 router.delete("/:id", isAuthenticated, adminOnly, deleteBooking);
 
@@ -45,8 +45,8 @@ router.post("/request", isAuthenticated, requestRefund);
 router.post("/process", isAuthenticated, adminOnly, processRefund);
 
 // ================= SEATS =================
-router.put("/update/:bookingId", isAuthenticated, updateBookingSeats);
-router.delete("/delete/:bookingId", isAuthenticated, deleteBookingSeats);
+router.put("/update/:bookingId", isAuthenticated, adminOnly, updateBookingSeats);
+router.delete("/delete/:bookingId", isAuthenticated, adminOnly, deleteBookingSeats);
 
 // ❗❗ MUST BE ABSOLUTELY LAST ❗❗
 router.get("/:id", isAuthenticated, getBookingById);

@@ -1,0 +1,11 @@
+import express from "express";
+import { isAuthenticated, adminOnly } from "../middleware/auth.js";
+import { getMessaging, createTemplate, editTemplate, deleteTemplate, sendMessages } from "../controller/messaging.js";
+const router = express.Router();
+router.use(isAuthenticated, adminOnly);
+router.get("/", getMessaging);
+router.post("/templates", createTemplate);
+router.put("/templates/:id", editTemplate);
+router.delete("/templates/:id", deleteTemplate);
+router.post("/send", sendMessages);
+export default router;

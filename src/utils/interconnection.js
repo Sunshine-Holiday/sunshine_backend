@@ -69,7 +69,7 @@ export function mergeSeatsIntoMap(map, seatList) {
  * Fetch booked seats for a trip on a date, optionally filtered by leg.
  * legs: array of allowed legs, e.g. ['single','going'] or null for all
  */
-export async function getBookedSeatsForTripDate(tripId, selectedDate, legs = null) {
+export async function getBookedSeatsForTripDate(tripId, selectedDate, legs = null, session = null, excludeBookingId = null) {
   if (!tripId || !selectedDate) return [];
 
   const filter = {
@@ -78,7 +78,8 @@ export async function getBookedSeatsForTripDate(tripId, selectedDate, legs = nul
     status: { $ne: "refund" },
   };
 
-  const bookings = await Booking.find(filter).select("selectedSeats").lean();
+  if (excludeBookingId) filter._id = { $ne: excludeBookingId };
+  const bookings = await Booking.find(filter).session(session).select("selectedSeats").lean();
   const seats = [];
 
   for (const b of bookings) {
@@ -109,14 +110,16 @@ export async function getBookedSeatsForTripDate(tripId, selectedDate, legs = nul
 export async function getInterconnectedOccupiedSeats(
   trip,
   selectedDate,
-  mapLeg = "single"
+  mapLeg = "single",
+  session = null,
+  excludeBookingId = null
 ) {
   const ic = getInterconnection(trip);
   const map = {};
 
   if (!ic.enabled) {
     // Normal trip: all seats on this trip/date
-    const seats = await getBookedSeatsForTripDate(trip._id, selectedDate, null);
+    const seats = await getBookedSeatsForTripDate(trip._id, selectedDate, null, session, excludeBookingId);
     return mergeSeatsIntoMap(map, seats);
   }
 
@@ -125,7 +128,7 @@ export async function getInterconnectedOccupiedSeats(
     const own = await getBookedSeatsForTripDate(trip._id, selectedDate, [
       "single",
       "going",
-    ]);
+    ], session, excludeBookingId);
     mergeSeatsIntoMap(map, own);
 
     if (ic.stayTrip) {
@@ -133,7 +136,7 @@ export async function getInterconnectedOccupiedSeats(
         ic.stayTrip,
         selectedDate,
         ["going"]
-      );
+      , session, excludeBookingId);
       mergeSeatsIntoMap(map, stayGoing);
     }
     return map;
@@ -144,7 +147,7 @@ export async function getInterconnectedOccupiedSeats(
     const own = await getBookedSeatsForTripDate(trip._id, selectedDate, [
       "single",
       "coming",
-    ]);
+    ], session, excludeBookingId);
     mergeSeatsIntoMap(map, own);
 
     if (ic.stayTrip) {
@@ -154,7 +157,7 @@ export async function getInterconnectedOccupiedSeats(
           ic.stayTrip,
           stayStart,
           ["coming"]
-        );
+        , session, excludeBookingId);
         mergeSeatsIntoMap(map, stayComing);
       }
     }
@@ -169,7 +172,7 @@ export async function getInterconnectedOccupiedSeats(
         trip._id,
         selectedDate,
         ["going"]
-      );
+      , session, excludeBookingId);
       mergeSeatsIntoMap(map, stayGoing);
 
       if (ic.outboundTrip) {
@@ -177,7 +180,7 @@ export async function getInterconnectedOccupiedSeats(
           ic.outboundTrip,
           selectedDate,
           ["single", "going"]
-        );
+        , session, excludeBookingId);
         mergeSeatsIntoMap(map, outbound);
       }
     }
@@ -187,7 +190,7 @@ export async function getInterconnectedOccupiedSeats(
         trip._id,
         selectedDate,
         ["coming"]
-      );
+      , session, excludeBookingId);
       mergeSeatsIntoMap(map, stayComing);
 
       const returnDate = addDaysToDateStr(selectedDate, ic.dayOffset);
@@ -196,7 +199,7 @@ export async function getInterconnectedOccupiedSeats(
           ic.returnTrip,
           returnDate,
           ["single", "coming"]
-        );
+        , session, excludeBookingId);
         mergeSeatsIntoMap(map, ret);
       }
     }
@@ -205,7 +208,7 @@ export async function getInterconnectedOccupiedSeats(
   }
 
   // Fallback
-  const seats = await getBookedSeatsForTripDate(trip._id, selectedDate, null);
+  const seats = await getBookedSeatsForTripDate(trip._id, selectedDate, null, session, excludeBookingId);
   return mergeSeatsIntoMap(map, seats);
 }
 
@@ -216,7 +219,9 @@ export async function getInterconnectedOccupiedSeats(
 export async function hasInterconnectedSeatConflict(
   trip,
   selectedDate,
-  selectedSeats
+  selectedSeats,
+  session = null,
+  excludeBookingId = null
 ) {
   const ic = getInterconnection(trip);
   if (!Array.isArray(selectedSeats) || selectedSeats.length === 0) {
@@ -248,7 +253,7 @@ export async function hasInterconnectedSeatConflict(
       trip,
       selectedDate,
       "single"
-    );
+    , session, excludeBookingId);
     checkAgainstMap(map, selectedSeats, "This trip");
     return {
       conflict: conflicts.length > 0,
@@ -263,14 +268,14 @@ export async function hasInterconnectedSeatConflict(
       trip,
       selectedDate,
       "single"
-    );
+    , session, excludeBookingId);
     checkAgainstMap(map, selectedSeats, "Outbound / Stay going");
   } else if (ic.role === "return") {
     const map = await getInterconnectedOccupiedSeats(
       trip,
       selectedDate,
       "single"
-    );
+    , session, excludeBookingId);
     checkAgainstMap(map, selectedSeats, "Return / Stay coming");
   } else if (ic.role === "stay") {
     const goingSeats =
@@ -282,7 +287,7 @@ export async function hasInterconnectedSeatConflict(
         trip,
         selectedDate,
         "going"
-      );
+      , session, excludeBookingId);
       checkAgainstMap(goingMap, goingSeats, "Going");
     }
     if (comingSeats.length) {
@@ -290,7 +295,7 @@ export async function hasInterconnectedSeatConflict(
         trip,
         selectedDate,
         "coming"
-      );
+      , session, excludeBookingId);
       checkAgainstMap(comingMap, comingSeats, "Coming");
     }
   }

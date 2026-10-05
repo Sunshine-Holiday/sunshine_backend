@@ -53,6 +53,8 @@ const passengerSchema = new mongoose.Schema({
 
 const bookingSchema = new mongoose.Schema(
   {
+    razorpayOrderId: { type: String },
+    razorpayPaymentId: { type: String },
     trip: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Trip",

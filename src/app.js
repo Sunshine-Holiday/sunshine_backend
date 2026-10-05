@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import express from "express";
-import Razorpay from "razorpay";
+export { razorpay, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } from "./utils/paymentClient.js";
 import { connectDB } from "./utils/db.js";
 import { v2 as cloudinary } from "cloudinary";
 import cors from "cors";
@@ -16,26 +16,21 @@ import galleryRouter from "./router/galleryRoutes.js";
 import tripRoutes from "./router/tripRoutes.js";
 import bookingRouter from "./router/booking.js";
 import aboutRouter from "./router/aboutRouter.js";
+import messagingRouter from "./router/messaging.js";
 import paymentRouter from "./router/payment.js";
+import { paymentWebhook } from "./controller/payment.js";
 import privacyRouter from "./router/privacyRouter.js";
 import reviewRouter from "./router/reviewRoutes.js";
 import specialSectionRoutes from "./router/specialSectionRoutes.js";
 import pickupLocationRoutes from "./router/pickupLocationRoutes.js";
 import brochureRoutes from "./router/brochureRoutes.js";
+import destinationPageRoutes from "./router/destinationPageRoutes.js";
 config();
 const app = express();
 const PORT = process.env.PORT;
 
 // Database Connection
 connectDB(process.env.MONGO_URI);
-
-// Razorpay Configuration
-export const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
-export const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
-export const razorpay = new Razorpay({
-  key_id: RAZORPAY_KEY_ID,
-  key_secret: RAZORPAY_KEY_SECRET,
-});
 
 // Cloudinary Configuration
 cloudinary.config({
@@ -67,6 +62,7 @@ const corsOptions = {
 };
 
 // Middleware
+app.post("/api/v1/payment/webhook", express.raw({ type: "application/json" }), paymentWebhook);
 app.use(express.json({ limit: "50mb" }));
 app.use(cors(corsOptions));
 app.use("/uploads", express.static("uploads"));
@@ -83,10 +79,12 @@ app.use("/api/v1/about", aboutRouter);
 app.use("/api/v1/privacy", privacyRouter);
 app.use("/api/v1/booking", bookingRouter);
 app.use("/api/v1/payment", paymentRouter);
+app.use("/api/v1/messaging", messagingRouter);
 app.use("/api/v1/review", reviewRouter);
 app.use("/api/v1/special-sections", specialSectionRoutes);
 app.use("/api/v1/pickup-locations", pickupLocationRoutes);
 app.use("/api/v1/brochures", brochureRoutes);
+app.use("/api/v1/destinations", destinationPageRoutes);
 // Error Handling
 // app.use(fileUploadErrorHandler);
 app.use(errorMiddleware);
