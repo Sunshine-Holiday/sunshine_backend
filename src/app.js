@@ -25,6 +25,7 @@ import specialSectionRoutes from "./router/specialSectionRoutes.js";
 import pickupLocationRoutes from "./router/pickupLocationRoutes.js";
 import brochureRoutes from "./router/brochureRoutes.js";
 import destinationPageRoutes from "./router/destinationPageRoutes.js";
+import driverTrackingRoutes from "./router/driverTrackingRoutes.js";
 config();
 const app = express();
 const PORT = process.env.PORT;
@@ -46,6 +47,8 @@ const corsOptions = {
       process.env.FRONTEND_URL,
       process.env.FRONTEND_URL2,
       process.env.FRONTEND_URL3,
+      "https://www.clone.sunshineholidaypackages.com",
+      "https://clone.sunshineholidaypackages.com",
       "http://localhost:5173"
     ];
 
@@ -85,6 +88,7 @@ app.use("/api/v1/special-sections", specialSectionRoutes);
 app.use("/api/v1/pickup-locations", pickupLocationRoutes);
 app.use("/api/v1/brochures", brochureRoutes);
 app.use("/api/v1/destinations", destinationPageRoutes);
+app.use("/api/v1/driver-tracking", driverTrackingRoutes);
 // Error Handling
 // app.use(fileUploadErrorHandler);
 app.use(errorMiddleware);
