@@ -533,6 +533,7 @@ export const getTripById = async (req, res) => {
 
 
 
+
 export const updateTrip = async (req, res) => {
   try {
     const id = req.params.id;
@@ -566,32 +567,44 @@ export const updateTrip = async (req, res) => {
     } = req.body;
 
     const file = req.file;
+
     const uploaded = Array.isArray(req.uploadedFiles)
       ? req.uploadedFiles
       : req.file
         ? [req.file]
         : [];
+
     const uploadedPaths = uploaded
       .map((f) => f?.path)
       .filter((p) => typeof p === "string" && p.trim());
 
     // ---------------------------
-    // 🔧 Helpers
+    // HELPERS
     // ---------------------------
+
     const parseArray = (field) => {
       if (Array.isArray(field)) return field;
-      if (!field) return [];
-      try {
-        const parsed = JSON.parse(field);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
+
+      if (field === undefined || field === null || field === "") {
         return [];
       }
+
+      if (typeof field === "string") {
+        try {
+          const parsed = JSON.parse(field);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [field];
+        }
+      }
+
+      return [];
     };
 
     // ---------------------------
-    // 🧠 Parse incoming data
+    // PARSE INCOMING DATA
     // ---------------------------
+
     const parsedAmenities = parseArray(amenities);
     const parsedBoardingPoints = parseArray(boardingPoints);
     const parsedDropPoints = parseArray(dropPoints);
@@ -603,8 +616,9 @@ export const updateTrip = async (req, res) => {
       price !== undefined && price !== "" ? Number(price) : 0;
 
     // ---------------------------
-    // ❗ BASIC VALIDATIONS
+    // BASIC VALIDATIONS
     // ---------------------------
+
     if (!title)
       return res.status(400).json({ message: "Title is required" });
 
@@ -635,10 +649,10 @@ export const updateTrip = async (req, res) => {
     }
 
     // ---------------------------
-    // 🚌 START DATES VALIDATION
+    // START DATES VALIDATION
     // ---------------------------
+
     for (const date of parsedStartDates) {
-      // Convert buses to NUMBER (IMPORTANT FIX)
       const buses = Number(date.numberOfBusesAvailable);
 
       if (!Number.isInteger(buses) || buses <= 0) {
@@ -647,10 +661,8 @@ export const updateTrip = async (req, res) => {
           .json({ message: "Invalid number of buses" });
       }
 
-      // normalize back to STRING (schema expects string)
       date.numberOfBusesAvailable = String(buses);
 
-      // Seats validation
       if (
         date.seats !== "block" &&
         (!Number.isInteger(date.seats) || date.seats <= 0)
@@ -662,8 +674,9 @@ export const updateTrip = async (req, res) => {
     }
 
     // ---------------------------
-    // 💰 PRICE / PACKAGE RULE
+    // PRICE / PACKAGE RULE
     // ---------------------------
+
     if (
       !readonly &&
       parsedPackages.length === 0 &&
@@ -675,8 +688,9 @@ export const updateTrip = async (req, res) => {
     }
 
     // ---------------------------
-    // 📦 PACKAGE VALIDATION
+    // PACKAGE VALIDATION
     // ---------------------------
+
     for (const pkg of parsedPackages) {
       if (!pkg.title) {
         return res
@@ -698,8 +712,9 @@ export const updateTrip = async (req, res) => {
     }
 
     // ---------------------------
-    // 🏨 ROOM VALIDATION
+    // ROOM VALIDATION
     // ---------------------------
+
     for (const room of parsedRoomChoices) {
       if (room.description) {
         if (!Number.isInteger(room.roomCount) || room.roomCount <= 0) {
@@ -717,8 +732,9 @@ export const updateTrip = async (req, res) => {
     }
 
     // ---------------------------
-    // 📊 PERCENTAGE VALIDATION
+    // PERCENTAGE VALIDATION
     // ---------------------------
+
     if (
       advancePaymentPercentage !== undefined &&
       (advancePaymentPercentage < 0 || advancePaymentPercentage > 100)
@@ -738,8 +754,9 @@ export const updateTrip = async (req, res) => {
     }
 
     // ---------------------------
-    // 🧾 UPDATE OBJECT
+    // UPDATE OBJECT
     // ---------------------------
+
     const updateData = {
       title,
       location,
@@ -751,8 +768,8 @@ export const updateTrip = async (req, res) => {
       amenities: parsedAmenities,
       boardingPoints: parsedBoardingPoints,
       dropPoints: parsedDropPoints,
-      packages: parsedPackages,     // ✅ empty array allowed
-      roomChoices: parsedRoomChoices, // ✅ empty array allowed
+      packages: parsedPackages,
+      roomChoices: parsedRoomChoices,
     };
 
     if (advancePaymentPercentage !== undefined) {
@@ -763,37 +780,52 @@ export const updateTrip = async (req, res) => {
       updateData.discountPercentage = discountPercentage;
     }
 
-    // Optional details-page fields
+    // ---------------------------
+    // OPTIONAL DETAILS-PAGE FIELDS
+    // ---------------------------
+
     if (highlights !== undefined) {
       updateData.highlights = parseArray(highlights).filter(
         (h) => typeof h === "string" && h.trim()
       );
     }
+
     if (includes !== undefined) {
       updateData.includes = parseArray(includes).filter(
         (h) => typeof h === "string" && h.trim()
       );
     }
+
+    // EXCLUDES - UPDATED
+    if (Object.prototype.hasOwnProperty.call(req.body, "excludes")) {
+      updateData.excludes = parseArray(req.body.excludes).filter(
+        (h) => typeof h === "string" && h.trim()
+      );
+    }
+
     if (faqs !== undefined) {
       updateData.faqs = parseArray(faqs).filter(
         (f) => f && f.question && f.answer
       );
     }
-    // Multi-banner update:
-    // - body.existingBanners / body.banners (JSON) = kept existing paths
-    // - uploaded files = new images to append
+
+    // ---------------------------
+    // MULTI-BANNER UPDATE
+    // ---------------------------
+
     const existingFromBody =
       req.body.existingBanners !== undefined
         ? req.body.existingBanners
         : banners;
+
     if (existingFromBody !== undefined || uploadedPaths.length > 0) {
-      // body.banners may be JSON string or polluted by multipart; prefer existingBanners
       let kept = [];
+
       if (existingFromBody !== undefined) {
         kept = parseArray(existingFromBody).filter(
           (b) => typeof b === "string" && b.trim() && !b.startsWith("{")
         );
-        // parseArray already handles JSON string; also filter accidental non-paths
+
         kept = kept.filter(
           (b) =>
             b.includes("uploads") ||
@@ -801,11 +833,14 @@ export const updateTrip = async (req, res) => {
             b.includes("/")
         );
       }
+
       const merged = [
         ...kept,
         ...uploadedPaths.filter((p) => !kept.includes(p)),
       ];
+
       const unique = [...new Set(merged.filter(Boolean))];
+
       if (unique.length > 0) {
         updateData.banners = unique;
         updateData.banner = unique[0];
@@ -817,46 +852,63 @@ export const updateTrip = async (req, res) => {
       updateData.banner = file.path;
       updateData.banners = [file.path];
     }
-    if (mapLink !== undefined) updateData.mapLink = String(mapLink || "");
+
+    if (mapLink !== undefined)
+      updateData.mapLink = String(mapLink || "");
+
     if (cancellationPolicy !== undefined)
       updateData.cancellationPolicy = String(cancellationPolicy || "");
+
     if (brochureImage !== undefined)
       updateData.brochureImage = String(brochureImage || "");
+
     if (brochureFile !== undefined)
       updateData.brochureFile = String(brochureFile || "");
+
     if (brochureId !== undefined) {
       updateData.brochureId =
         brochureId && String(brochureId).trim() ? brochureId : null;
     }
 
-    // Interconnected trips config
+    // ---------------------------
+    // INTERCONNECTED TRIPS CONFIG
+    // ---------------------------
+
     if (req.body.interconnection !== undefined) {
       const { parseInterconnectionBody } = await import(
         "../utils/interconnection.js"
       );
+
       updateData.interconnection = parseInterconnectionBody(req.body);
     }
 
     // ---------------------------
-    // 🚀 UPDATE DB
+    // UPDATE DATABASE
     // ---------------------------
+
     const updatedTrip = await Trip.findByIdAndUpdate(
       id,
       { $set: updateData },
-      { new: true }
+      { new: true, runValidators: true }
     );
 
     if (!updatedTrip) {
       return res.status(404).json({ message: "Trip not found" });
     }
 
+    // ---------------------------
+    // UPDATE INTERCONNECTED TRIPS
+    // ---------------------------
+
     if (
       updatedTrip.interconnection?.enabled &&
       updatedTrip.interconnection.role === "stay"
     ) {
       const stayId = updatedTrip._id;
+
       const { outboundTrip, returnTrip, dayOffset } =
         updatedTrip.interconnection;
+
       if (outboundTrip) {
         await Trip.findByIdAndUpdate(outboundTrip, {
           $set: {
@@ -867,6 +919,7 @@ export const updateTrip = async (req, res) => {
           },
         });
       }
+
       if (returnTrip) {
         await Trip.findByIdAndUpdate(returnTrip, {
           $set: {
@@ -879,12 +932,18 @@ export const updateTrip = async (req, res) => {
       }
     }
 
+    // ---------------------------
+    // RESPONSE
+    // ---------------------------
+
     res.status(200).json(updatedTrip);
+
   } catch (error) {
     console.error("Update trip error:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 export const deleteTrip = async (req, res) => {
   try {
