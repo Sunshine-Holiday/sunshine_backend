@@ -333,7 +333,7 @@ export const contact = TryCatch(async (req, res, next) => {
     email: process.env.SMTP_USER,
     subject: `Contact request from ${name}`,
     html,
-    from: email,
+    replyTo: email,
   });
   return res.status(200).json({
     success: true,

@@ -828,13 +828,11 @@ export const requestRefund = async (req, res) => {
       email: req.user.email,
       html,
       subject: "Refund Request Confirmation - Sunshine Holiday Packages",
-      from: "sunshineholidaypackages@gmail.com",
     });
     await sendMail({
       email: "sunshineholidaypackages@gmail.com",
       html,
       subject: "Refund Request Confirmation - Sunshine Holiday Packages",
-      from: "sunshineholidaypackages@gmail.com",
     });
     return res.status(200).json({
       success: true,
@@ -876,13 +874,11 @@ export const processRefund = async (req, res) => {
       email: booking.user.email, // Access email from populated user
       html,
       subject: "Refund Processed - Sunshine Holiday Packages",
-      from: "sunshineholidaypackages@gmail.com",
     });
     await sendMail({
       email: "sunshineholidaypackages@gmail.com",
       html,
       subject: "Refund Processed - Sunshine Holiday Packages",
-      from: "sunshineholidaypackages@gmail.com",
     });
 
     return res.status(200).json({
