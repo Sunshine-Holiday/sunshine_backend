@@ -68,6 +68,7 @@ export const createTrip = async (req, res) => {
       : req.file
         ? [req.file]
         : [];
+
     const uploadedPaths = uploaded
       .map((f) => f?.path)
       .filter((p) => typeof p === "string" && p.trim());
@@ -75,6 +76,7 @@ export const createTrip = async (req, res) => {
     if (uploadedPaths.length === 0) {
       return res.status(400).json({ message: "At least one banner image is required" });
     }
+
     const file = { path: uploadedPaths[0] };
 
     const {
@@ -91,107 +93,118 @@ export const createTrip = async (req, res) => {
       dropPoints,
       packages,
       roomChoices,
-         advancePaymentPercentage,
-    discountPercentage
+      advancePaymentPercentage,
+      discountPercentage
     } = req.body;
 
     // Parse arrays from form data
     const parsedAmenities = Array.isArray(amenities)
       ? amenities
       : amenities
-      ? JSON.parse(amenities)
-      : [];
+        ? JSON.parse(amenities)
+        : [];
 
     const parsedBoardingPoints = Array.isArray(boardingPoints)
       ? boardingPoints
       : boardingPoints
-      ? JSON.parse(boardingPoints)
-      : [];
+        ? JSON.parse(boardingPoints)
+        : [];
 
     const parsedDropPoints = Array.isArray(dropPoints)
       ? dropPoints
       : dropPoints
-      ? (() => {
-          try {
-            const parsed = JSON.parse(dropPoints);
-            return Array.isArray(parsed) ? parsed : [parsed];
-          } catch (e) {
-            return [];
-          }
-        })()
-      : [];
+        ? (() => {
+            try {
+              const parsed = JSON.parse(dropPoints);
+              return Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+              return [];
+            }
+          })()
+        : [];
 
     const parsedStartDates = Array.isArray(startDates)
       ? startDates
       : startDates
-      ? (() => {
-          try {
-            const parsed = JSON.parse(startDates);
-            return Array.isArray(parsed) ? parsed : [parsed];
-          } catch (e) {
-            return [];
-          }
-        })()
-      : [];
+        ? (() => {
+            try {
+              const parsed = JSON.parse(startDates);
+              return Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+              return [];
+            }
+          })()
+        : [];
 
     const parsedPackages = Array.isArray(packages)
       ? packages
       : packages
-      ? (() => {
-          try {
-            const parsed = JSON.parse(packages);
-            return Array.isArray(parsed) ? parsed : [parsed];
-          } catch (e) {
-            return [];
-          }
-        })()
-      : [];
+        ? (() => {
+            try {
+              const parsed = JSON.parse(packages);
+              return Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+              return [];
+            }
+          })()
+        : [];
 
     const parsedRoomChoices = Array.isArray(roomChoices)
       ? roomChoices
       : roomChoices
-      ? (() => {
-          try {
-            const parsed = JSON.parse(roomChoices);
-            return Array.isArray(parsed) ? parsed : [parsed];
-          } catch (e) {
-            return [];
-          }
-        })()
-      : [];
+        ? (() => {
+            try {
+              const parsed = JSON.parse(roomChoices);
+              return Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+              return [];
+            }
+          })()
+        : [];
 
     // Validate required fields
     if (!title) {
       return res.status(400).json({ message: "Title is required" });
     }
+
     if (!location) {
       return res.status(400).json({ message: "Location is required" });
     }
+
     if (!state || !String(state).trim()) {
       return res.status(400).json({ message: "State / destination is required" });
     }
+
     if (!description) {
       return res.status(400).json({ message: "Description is required" });
     }
+
     if (!category) {
       return res.status(400).json({ message: "Category is required" });
     }
-    if (!readonly &&parsedStartDates.length === 0) {
+
+    if (!readonly && parsedStartDates.length === 0) {
       return res.status(400).json({ message: "At least one start date is required" });
     }
+
     if (parsedBoardingPoints.length === 0) {
       return res.status(400).json({ message: "At least one boarding point is required" });
     }
 
     // Validate price and packages
     const parsedPrice = price ? parseFloat(price) : 0;
+
     if (!readonly && parsedPackages.length === 0 && (!parsedPrice || parsedPrice <= 0)) {
       return res.status(400).json({ message: "Price is required when no packages are provided" });
     }
 
     // Validate startDates format
     for (const startDate of parsedStartDates) {
-      if (startDate.seats !== undefined && startDate.seats !== "block" && (!Number.isInteger(startDate.seats) || startDate.seats <= 0)) {
+      if (
+        startDate.seats !== undefined &&
+        startDate.seats !== "block" &&
+        (!Number.isInteger(startDate.seats) || startDate.seats <= 0)
+      ) {
         return res.status(400).json({ message: "Seats must be a positive integer if provided" });
       }
     }
@@ -201,9 +214,11 @@ export const createTrip = async (req, res) => {
       if (!pkg.title) {
         return res.status(400).json({ message: "Package title is required" });
       }
+
       if (!pkg.personCount || !Number.isInteger(pkg.personCount) || pkg.personCount <= 0) {
         return res.status(400).json({ message: "Package person count must be a positive integer" });
       }
+
       if (!pkg.price || isNaN(pkg.price) || pkg.price <= 0) {
         return res.status(400).json({ message: "Package price must be a positive number" });
       }
@@ -215,9 +230,11 @@ export const createTrip = async (req, res) => {
         // if (!room.personCount || !Number.isInteger(room.personCount) || room.personCount <= 0) {
         //   return res.status(400).json({ message: "Room choice person count must be a positive integer" });
         // }
+
         if (!room.roomCount || !Number.isInteger(room.roomCount) || room.roomCount <= 0) {
           return res.status(400).json({ message: "Room choice room count must be a positive integer" });
         }
+
         if (!room.price || isNaN(room.price) || room.price <= 0) {
           return res.status(400).json({ message: "Room choice price must be a positive number" });
         }
@@ -226,9 +243,11 @@ export const createTrip = async (req, res) => {
 
     // Construct trip object with provided fields
     const tripData = { banner: file.path };
+
     if (readonly) {
       tripData.readonly = readonly;
     }
+
     if (title) tripData.title = title;
     if (parsedPrice > 0) tripData.price = parsedPrice;
     if (location) tripData.location = location;
@@ -241,16 +260,19 @@ export const createTrip = async (req, res) => {
     const { parseInterconnectionBody } = await import(
       "../utils/interconnection.js"
     );
+
     tripData.interconnection = parseInterconnectionBody(req.body);
+
     if (parsedAmenities.length > 0) tripData.amenities = parsedAmenities;
     if (parsedBoardingPoints.length > 0) tripData.boardingPoints = parsedBoardingPoints;
     if (parsedDropPoints.length > 0) tripData.dropPoints = parsedDropPoints;
     if (parsedPackages.length > 0) tripData.packages = parsedPackages;
     if (parsedRoomChoices.length > 0) tripData.roomChoices = parsedRoomChoices;
- 
+
     if (typeof advancePaymentPercentage !== "undefined") {
       tripData.advancePaymentPercentage = advancePaymentPercentage;
     }
+
     if (typeof discountPercentage !== "undefined") {
       tripData.discountPercentage = discountPercentage;
     }
@@ -259,6 +281,7 @@ export const createTrip = async (req, res) => {
     const parseJsonArray = (field) => {
       if (Array.isArray(field)) return field;
       if (!field) return [];
+
       try {
         const p = JSON.parse(field);
         return Array.isArray(p) ? p : [];
@@ -266,9 +289,11 @@ export const createTrip = async (req, res) => {
         return [];
       }
     };
+
     const {
       highlights,
       includes,
+      excludes,
       mapLink,
       faqs,
       cancellationPolicy,
@@ -281,40 +306,64 @@ export const createTrip = async (req, res) => {
     const parsedHighlights = parseJsonArray(highlights).filter(
       (h) => typeof h === "string" && h.trim()
     );
+
     const parsedIncludes = parseJsonArray(includes).filter(
       (h) => typeof h === "string" && h.trim()
     );
+
+    // NEW: Parse and filter excludes
+    const parsedExcludes = parseJsonArray(excludes).filter(
+      (h) => typeof h === "string" && h.trim()
+    );
+
     const parsedFaqs = parseJsonArray(faqs).filter(
       (f) => f && f.question && f.answer
     );
+
     const parsedBanners = parseJsonArray(banners).filter(
       (b) => typeof b === "string" && b.trim()
     );
 
     if (parsedHighlights.length) tripData.highlights = parsedHighlights;
     if (parsedIncludes.length) tripData.includes = parsedIncludes;
+
+    // NEW: Save excludes
+    if (parsedExcludes.length) tripData.excludes = parsedExcludes;
+
     if (parsedFaqs.length) tripData.faqs = parsedFaqs;
+
     if (mapLink) tripData.mapLink = String(mapLink).trim();
+
     if (cancellationPolicy)
       tripData.cancellationPolicy = String(cancellationPolicy);
+
     if (brochureImage) tripData.brochureImage = String(brochureImage);
     if (brochureFile) tripData.brochureFile = String(brochureFile);
+
     if (brochureId !== undefined) {
       tripData.brochureId =
         brochureId && String(brochureId).trim() ? brochureId : null;
     }
+
     // Merge path strings from body (rare) with newly uploaded files; primary = first
     const allBanners = [
       ...uploadedPaths,
       ...parsedBanners.filter((b) => !uploadedPaths.includes(b)),
     ];
+
     // Dedupe preserve order
     tripData.banners = [...new Set(allBanners.filter(Boolean))];
     tripData.banner = tripData.banners[0];
 
     // New trips go to the end of preference order
-    const lastTrip = await Trip.findOne().sort({ displayIndex: -1 }).select("displayIndex");
-    const maxIndex = lastTrip?.displayIndex ? Number(lastTrip.displayIndex) : 0;
+    const lastTrip = await Trip.findOne()
+      .sort({ displayIndex: -1 })
+      .select("displayIndex");
+
+    const maxIndex = lastTrip?.displayIndex
+      ? Number(lastTrip.displayIndex)
+      : 0;
+
     tripData.displayIndex = maxIndex > 0 ? maxIndex + 1 : 1;
 
     const trip = new Trip(tripData);
@@ -328,6 +377,7 @@ export const createTrip = async (req, res) => {
       const stayId = savedTrip._id;
       const { outboundTrip, returnTrip, dayOffset } =
         savedTrip.interconnection;
+
       if (outboundTrip) {
         await Trip.findByIdAndUpdate(outboundTrip, {
           $set: {
@@ -338,6 +388,7 @@ export const createTrip = async (req, res) => {
           },
         });
       }
+
       if (returnTrip) {
         await Trip.findByIdAndUpdate(returnTrip, {
           $set: {
@@ -351,6 +402,7 @@ export const createTrip = async (req, res) => {
     }
 
     res.status(201).json(savedTrip);
+
   } catch (error) {
     console.error("Error creating trip:", error);
     res.status(500).json({ message: error.message });
@@ -503,6 +555,7 @@ export const updateTrip = async (req, res) => {
       readonly,
       highlights,
       includes,
+      excludes,
       mapLink,
       faqs,
       cancellationPolicy,

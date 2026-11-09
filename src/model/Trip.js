@@ -86,6 +86,8 @@ const tripSchema = new mongoose.Schema({
   highlights: { type: [String], default: [] },
   /** What the tour price includes */
   includes: { type: [String], default: [] },
+  /** What the tour price excludes */
+  excludes: { type: [String], default: [] },
   /** Google Maps link / embed URL for tour map */
   mapLink: { type: String, default: "" },
   /** Brochure image path (preview) */
